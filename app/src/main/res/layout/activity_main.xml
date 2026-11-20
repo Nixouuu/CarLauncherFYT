@@ -14,7 +14,7 @@
         android:background="@drawable/bg_dock"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingTop="12dp"
+        android:paddingTop="10dp"
         android:paddingBottom="10dp">
 
         <TextView
@@ -31,10 +31,24 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="6dp"
             android:text="20 nov."
             android:textColor="@color/text_secondary"
             android:textSize="11sp" />
+
+        <!-- Badge Mise à jour OTA (visible uniquement si une nouvelle version GitHub existe) -->
+        <TextView
+            android:id="@+id/btnOtaUpdate"
+            android:layout_width="54dp"
+            android:layout_height="24dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_update_badge"
+            android:gravity="center"
+            android:text="@string/update_available"
+            android:textColor="@color/text_primary"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/dockNav"
@@ -106,7 +120,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- Bandeau Prochaine direction (affiché si Waze/Maps actif en arrière-plan) -->
         <LinearLayout
             android:id="@+id/navBanner"
             android:layout_width="match_parent"
@@ -138,7 +151,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Badge Vitesse km/h en bas à gauche -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -171,7 +183,6 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Bouton Ouvrir Waze en bas à droite -->
         <LinearLayout
             android:id="@+id/btnOpenWaze"
             android:layout_width="wrap_content"
@@ -211,7 +222,6 @@
         android:layout_weight="44"
         android:orientation="vertical">
 
-        <!-- Carte Lecteur Musique Complet -->
         <LinearLayout
             android:id="@+id/cardMusicPanel"
             android:layout_width="match_parent"
@@ -222,7 +232,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Pochette + Infos Morceau -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -237,7 +246,7 @@
                     android:layout_marginRight="14dp"
                     android:background="@drawable/bg_art_placeholder"
                     android:contentDescription="@string/music_title"
-                    android:scaleType="centerCrop"
+                    android:scaleType="center"
                     android:src="@drawable/ic_music" />
 
                 <LinearLayout
@@ -286,7 +295,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Gros Boutons Audio -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="68dp"
@@ -327,7 +335,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Carte Téléphone / Retour système rapide -->
         <LinearLayout
             android:id="@+id/cardPhone"
             android:layout_width="match_parent"

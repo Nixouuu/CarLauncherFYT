@@ -22,9 +22,7 @@ public class CarNotificationListenerService extends NotificationListenerService 
                 CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
                 CharSequence text = extras.getCharSequence(Notification.EXTRA_TEXT);
                 StringBuilder sb = new StringBuilder();
-                if (title != null && title.length() > 0) {
-                    sb.append(title);
-                }
+                if (title != null && title.length() > 0) sb.append(title);
                 if (text != null && text.length() > 0) {
                     if (sb.length() > 0) sb.append(" • ");
                     sb.append(text);

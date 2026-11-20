@@ -7,6 +7,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,12 +29,30 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Build APK (Signed Release if secret set, else Debug)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+            gradle assembleRelease -PappVersionCode=${{ github.run_number }} -PappVersionName=2.${{ github.run_number }} --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk CarLauncherFYT.apk
+          else
+            gradle assembleDebug -PappVersionCode=${{ github.run_number }} -PappVersionName=2.${{ github.run_number }} --no-daemon --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk CarLauncherFYT.apk
+          fi
 
-      - name: Upload app-debug.apk
+      - name: Upload CarLauncherFYT.apk artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CarLauncherFYT-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CarLauncherFYT-apk
+          path: CarLauncherFYT.apk
           if-no-files-found: error
+
+      - name: Publish GitHub Release (OTA)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.${{ github.run_number }}
+          name: CarLauncher FYT v2.${{ github.run_number }}
+          files: CarLauncherFYT.apk

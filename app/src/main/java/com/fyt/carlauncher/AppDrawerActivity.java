@@ -55,11 +55,8 @@ public class AppDrawerActivity extends Activity {
 
                 for (ResolveInfo ri : resolveInfos) {
                     String pkg = ri.activityInfo.packageName;
-                    if (selfPackage.equals(pkg)) {
-                        continue;
-                    }
-                    String label = ri.loadLabel(pm).toString();
-                    apps.add(new AppInfo(label, pkg, ri.loadIcon(pm)));
+                    if (selfPackage.equals(pkg)) continue;
+                    apps.add(new AppInfo(ri.loadLabel(pm).toString(), pkg, ri.loadIcon(pm)));
                 }
 
                 Collections.sort(apps, new Comparator<AppInfo>() {
@@ -72,15 +69,8 @@ public class AppDrawerActivity extends Activity {
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (isFinishing() || isDestroyed()) {
-                            return;
-                        }
-                        AppListAdapter adapter = new AppListAdapter(
-                                AppDrawerActivity.this,
-                                apps,
-                                R.layout.item_app_grid
-                        );
-                        gridApps.setAdapter(adapter);
+                        if (isFinishing() || isDestroyed()) return;
+                        gridApps.setAdapter(new AppListAdapter(AppDrawerActivity.this, apps, R.layout.item_app_grid));
                         gridApps.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                             @Override
                             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {

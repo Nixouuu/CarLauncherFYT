@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
+def verCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : 2
+def verName = project.hasProperty('appVersionName') ? project.property('appVersionName').toString() : "2.0"
+
 android {
     namespace 'com.fyt.carlauncher'
     compileSdk 33
@@ -10,15 +13,28 @@ android {
         applicationId "com.fyt.carlauncher"
         minSdk 24
         targetSdk 33
-        versionCode 2
-        versionName "2.0"
+        versionCode verCode
+        versionName verName
+    }
+
+    signingConfigs {
+        release {
+            if (file("release.keystore").exists()) {
+                storeFile file("release.keystore")
+                storePassword System.getenv("KEYSTORE_PASS") ?: "carlauncher"
+                keyAlias System.getenv("KEY_ALIAS") ?: "carlauncher"
+                keyPassword System.getenv("KEY_PASS") ?: "carlauncher"
+            }
+        }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (file("release.keystore").exists()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            shrinkResources false
         }
         debug {
             minifyEnabled false
@@ -32,6 +48,5 @@ android {
 }
 
 dependencies {
-    // Carte GPS OpenStreetMap native légère (sans AndroidX, sans clé API Google)
-    implementation 'org.osmdroid:osmdroid-android:6.1.18'
+    implementation 'org.osmdroid:osmdroid-android:6.1.20'
 }

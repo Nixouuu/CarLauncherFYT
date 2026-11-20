@@ -75,6 +75,7 @@ public class MainActivity extends Activity {
     private TextView tvTrackTitle;
     private TextView tvTrackArtist;
     private TextView btnEnableMediaAccess;
+    private TextView btnOtaUpdate;
     private ImageView imgAlbumArt;
     private View navBanner;
     private TextView tvNavInstruction;
@@ -83,6 +84,7 @@ public class MainActivity extends Activity {
     private Marker carMarker;
     private LocationManager locationManager;
     private boolean hasCenteredOnce = false;
+    private String pendingUpdateUrl = null;
 
     private SharedPreferences prefs;
     private AudioManager audioManager;
@@ -121,11 +123,6 @@ public class MainActivity extends Activity {
         public void onMetadataChanged(MediaMetadata metadata) {
             updateMediaMetadata(metadata);
         }
-
-        @Override
-        public void onPlaybackStateChanged(PlaybackState state) {
-            super.onPlaybackStateChanged(state);
-        }
     };
 
     private final MediaSessionManager.OnActiveSessionsChangedListener sessionsListener =
@@ -141,15 +138,9 @@ public class MainActivity extends Activity {
         public void onLocationChanged(Location location) {
             updateMapLocation(location);
         }
-
-        @Override
-        public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-        @Override
-        public void onProviderEnabled(String provider) {}
-
-        @Override
-        public void onProviderDisabled(String provider) {}
+        @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+        @Override public void onProviderEnabled(String provider) {}
+        @Override public void onProviderDisabled(String provider) {}
     };
 
     @Override
@@ -176,6 +167,7 @@ public class MainActivity extends Activity {
         setupActions();
         refreshShortcutLabels();
         checkLocationPermission();
+        checkOtaUpdate();
     }
 
     private void bindViews() {
@@ -187,10 +179,21 @@ public class MainActivity extends Activity {
         tvTrackTitle = findViewById(R.id.tvTrackTitle);
         tvTrackArtist = findViewById(R.id.tvTrackArtist);
         btnEnableMediaAccess = findViewById(R.id.btnEnableMediaAccess);
+        btnOtaUpdate = findViewById(R.id.btnOtaUpdate);
         imgAlbumArt = findViewById(R.id.imgAlbumArt);
         navBanner = findViewById(R.id.navBanner);
         tvNavInstruction = findViewById(R.id.tvNavInstruction);
         mapView = findViewById(R.id.mapView);
+    }
+
+    private void checkOtaUpdate() {
+        OtaUpdater.checkForUpdate(this, executor, new OtaUpdater.UpdateCallback() {
+            @Override
+            public void onUpdateAvailable(String latestTag, String downloadUrl) {
+                pendingUpdateUrl = downloadUrl;
+                btnOtaUpdate.setVisibility(View.VISIBLE);
+            }
+        });
     }
 
     private void setupMap() {
@@ -208,23 +211,23 @@ public class MainActivity extends Activity {
     }
 
     private void setupActions() {
-        findViewById(R.id.btnPrev).setOnClickListener(new View.OnClickListener() {
+        btnOtaUpdate.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+                if (!TextUtils.isEmpty(pendingUpdateUrl)) {
+                    OtaUpdater.downloadAndInstall(MainActivity.this, executor, pendingUpdateUrl);
+                }
             }
+        });
+
+        findViewById(R.id.btnPrev).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PREVIOUS); }
         });
         findViewById(R.id.btnPlayPause).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-            }
+            @Override public void onClick(View v) { triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); }
         });
         findViewById(R.id.btnNext).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_NEXT);
-            }
+            @Override public void onClick(View v) { triggerMediaAction(KeyEvent.KEYCODE_MEDIA_NEXT); }
         });
 
         btnEnableMediaAccess.setOnClickListener(new View.OnClickListener() {
@@ -245,7 +248,6 @@ public class MainActivity extends Activity {
         setupShortcutView(R.id.dockPhone, SLOT_PHONE, getString(R.string.phone_title));
         setupShortcutView(R.id.cardPhone, SLOT_PHONE, getString(R.string.phone_title));
 
-        // Long click sur la carte musique pour associer une appli audio
         findViewById(R.id.cardMusicPanel).setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
@@ -263,7 +265,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Bouton Système voiture (retour au Launcher d'origine ou choix du Launcher par défaut)
         View dockCarSystem = findViewById(R.id.dockCarSystem);
         dockCarSystem.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -302,9 +303,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (mapView != null) {
-            mapView.onResume();
-        }
+        if (mapView != null) mapView.onResume();
         updateClockAndDate();
         refreshShortcutLabels();
         startLocationUpdates();
@@ -328,23 +327,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (mapView != null) {
-            mapView.onPause();
-        }
-        try {
-            unregisterReceiver(timeReceiver);
-        } catch (IllegalArgumentException ignored) {}
-        try {
-            unregisterReceiver(navReceiver);
-        } catch (IllegalArgumentException ignored) {}
+        if (mapView != null) mapView.onPause();
+        try { unregisterReceiver(timeReceiver); } catch (IllegalArgumentException ignored) {}
+        try { unregisterReceiver(navReceiver); } catch (IllegalArgumentException ignored) {}
         stopLocationUpdates();
         teardownMediaSessions();
     }
 
     @Override
-    public void onBackPressed() {
-        // Launcher : ne quitte pas l'accueil sur Retour
-    }
+    public void onBackPressed() {}
 
     @Override
     protected void onDestroy() {
@@ -364,9 +355,7 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_LOCATION) {
-            startLocationUpdates();
-        }
+        if (requestCode == REQ_LOCATION) startLocationUpdates();
     }
 
     private void startLocationUpdates() {
@@ -377,9 +366,7 @@ public class MainActivity extends Activity {
         }
         try {
             Location lastGps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (lastGps != null) {
-                updateMapLocation(lastGps);
-            }
+            if (lastGps != null) updateMapLocation(lastGps);
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 3f, locationListener);
             }
@@ -391,9 +378,7 @@ public class MainActivity extends Activity {
 
     private void stopLocationUpdates() {
         if (locationManager != null) {
-            try {
-                locationManager.removeUpdates(locationListener);
-            } catch (Exception ignored) {}
+            try { locationManager.removeUpdates(locationListener); } catch (Exception ignored) {}
         }
     }
 
@@ -434,23 +419,17 @@ public class MainActivity extends Activity {
 
     private void teardownMediaSessions() {
         if (mediaSessionManager != null) {
-            try {
-                mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener);
-            } catch (Exception ignored) {}
+            try { mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener); } catch (Exception ignored) {}
         }
         if (activeController != null) {
-            try {
-                activeController.unregisterCallback(mediaCallback);
-            } catch (Exception ignored) {}
+            try { activeController.unregisterCallback(mediaCallback); } catch (Exception ignored) {}
             activeController = null;
         }
     }
 
     private void bindActiveMediaController(List<MediaController> controllers) {
         if (activeController != null) {
-            try {
-                activeController.unregisterCallback(mediaCallback);
-            } catch (Exception ignored) {}
+            try { activeController.unregisterCallback(mediaCallback); } catch (Exception ignored) {}
             activeController = null;
         }
         if (controllers != null && !controllers.isEmpty()) {
@@ -469,13 +448,9 @@ public class MainActivity extends Activity {
         if (metadata == null) return;
         String title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE);
         String artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST);
-        if (TextUtils.isEmpty(artist)) {
-            artist = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM);
-        }
+        if (TextUtils.isEmpty(artist)) artist = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM);
         Bitmap art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
-        if (art == null) {
-            art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
-        }
+        if (art == null) art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
 
         tvTrackTitle.setText(!TextUtils.isEmpty(title) ? title : getString(R.string.media_idle_title));
         tvTrackArtist.setText(!TextUtils.isEmpty(artist) ? artist : "");
@@ -535,17 +510,10 @@ public class MainActivity extends Activity {
     private void setupShortcutView(int viewId, final String slotKey, final String slotDisplayName) {
         View view = findViewById(viewId);
         view.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                launchAssignedApp(slotKey, slotDisplayName);
-            }
+            @Override public void onClick(View v) { launchAssignedApp(slotKey, slotDisplayName); }
         });
         view.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                openAppPickerDialog(slotKey, slotDisplayName);
-                return true;
-            }
+            @Override public boolean onLongClick(View v) { openAppPickerDialog(slotKey, slotDisplayName); return true; }
         });
     }
 
@@ -653,7 +621,7 @@ public class MainActivity extends Activity {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(this, R.string.settings_error, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.launcher_settings_error, Toast.LENGTH_SHORT).show();
         }
     }
 }
