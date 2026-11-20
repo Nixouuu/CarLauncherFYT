@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_primary">#090B0F</color>
-    <color name="bg_secondary">#12161F</color>
-    <color name="dock_bg">#0C1018</color>
-    <color name="card_surface">#171C26</color>
-    <color name="card_border">#2A3342</color>
-    <color name="text_primary">#F4F7FB</color>
+    <color name="bg_primary">#07090E</color>
+    <color name="bg_secondary">#10141E</color>
+    <color name="text_primary">#F8FAFC</color>
     <color name="text_secondary">#94A3B8</color>
     <color name="text_muted">#64748B</color>
     <color name="accent_blue">#38BDF8</color>
