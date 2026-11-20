@@ -2,6 +2,7 @@
 <resources>
     <color name="bg_primary">#090B0F</color>
     <color name="bg_secondary">#12161F</color>
+    <color name="dock_bg">#0C1018</color>
     <color name="card_surface">#171C26</color>
     <color name="card_border">#2A3342</color>
     <color name="text_primary">#F4F7FB</color>
@@ -10,5 +11,5 @@
     <color name="accent_blue">#38BDF8</color>
     <color name="accent_purple">#A78BFA</color>
     <color name="accent_green">#34D399</color>
-    <color name="ripple_color">#33FFFFFF</color>
+    <color name="accent_amber">#FBBF24</color>
 </resources>

@@ -10,8 +10,8 @@ android {
         applicationId "com.fyt.carlauncher"
         minSdk 24
         targetSdk 33
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "2.0"
     }
 
     buildTypes {
@@ -32,6 +32,6 @@ android {
 }
 
 dependencies {
-    // Aucune dépendance externe (pas d'AndroidX, pas de Compose, pas de WebView)
-    // Empreinte RAM minimale pour autoradio 1 Go RAM.
+    // Carte GPS OpenStreetMap native légère (sans AndroidX, sans clé API Google)
+    implementation 'org.osmdroid:osmdroid-android:6.1.18'
 }

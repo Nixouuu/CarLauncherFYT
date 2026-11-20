@@ -1,2 +1,2 @@
-# ProGuard rules for CarLauncherFYT
 -keepattributes SourceFile,LineNumberTable
+-dontwarn org.osmdroid.**

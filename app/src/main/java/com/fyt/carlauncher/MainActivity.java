@@ -1,26 +1,47 @@
 package com.fyt.carlauncher;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.AudioManager;
+import android.media.MediaMetadata;
+import android.media.session.MediaController;
+import android.media.session.MediaSessionManager;
+import android.media.session.PlaybackState;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.osmdroid.config.Configuration;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.TilesOverlay;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -35,27 +56,42 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
 
     private static final String PREFS_NAME = "car_launcher_prefs";
+    private static final int REQ_LOCATION = 1001;
 
     private static final String SLOT_NAV = "slot_nav";
     private static final String SLOT_MUSIC = "slot_music";
     private static final String SLOT_PHONE = "slot_phone";
+    private static final String SLOT_STOCK_HOME = "slot_stock_home";
 
     private static final String KEY_PKG_SUFFIX = "_pkg";
     private static final String KEY_NAME_SUFFIX = "_name";
-
     private static final String DEFAULT_WAZE_PKG = "com.waze";
 
     private TextView tvClock;
     private TextView tvDate;
-    private TextView tvNavSub;
-    private TextView tvMusicSub;
     private TextView tvPhoneSub;
+    private TextView tvOpenNavLabel;
+    private TextView tvSpeed;
+    private TextView tvTrackTitle;
+    private TextView tvTrackArtist;
+    private TextView btnEnableMediaAccess;
+    private ImageView imgAlbumArt;
+    private View navBanner;
+    private TextView tvNavInstruction;
+
+    private MapView mapView;
+    private Marker carMarker;
+    private LocationManager locationManager;
+    private boolean hasCenteredOnce = false;
 
     private SharedPreferences prefs;
     private AudioManager audioManager;
+    private MediaSessionManager mediaSessionManager;
+    private MediaController activeController;
+    private ComponentName listenerComponent;
 
     private final SimpleDateFormat clockFormat = new SimpleDateFormat("HH:mm", Locale.FRENCH);
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE d MMMM yyyy", Locale.FRENCH);
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("d MMM", Locale.FRENCH);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -67,57 +103,195 @@ public class MainActivity extends Activity {
         }
     };
 
+    private final BroadcastReceiver navReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String text = intent.getStringExtra(CarNotificationListenerService.EXTRA_NAV_TEXT);
+            if (!TextUtils.isEmpty(text)) {
+                tvNavInstruction.setText(text);
+                navBanner.setVisibility(View.VISIBLE);
+            } else {
+                navBanner.setVisibility(View.GONE);
+            }
+        }
+    };
+
+    private final MediaController.Callback mediaCallback = new MediaController.Callback() {
+        @Override
+        public void onMetadataChanged(MediaMetadata metadata) {
+            updateMediaMetadata(metadata);
+        }
+
+        @Override
+        public void onPlaybackStateChanged(PlaybackState state) {
+            super.onPlaybackStateChanged(state);
+        }
+    };
+
+    private final MediaSessionManager.OnActiveSessionsChangedListener sessionsListener =
+            new MediaSessionManager.OnActiveSessionsChangedListener() {
+                @Override
+                public void onActiveSessionsChanged(List<MediaController> controllers) {
+                    bindActiveMediaController(controllers);
+                }
+            };
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            updateMapLocation(location);
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+        @Override
+        public void onProviderEnabled(String provider) {}
+
+        @Override
+        public void onProviderDisabled(String provider) {}
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Configuration.getInstance().load(
+                getApplicationContext(),
+                PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
+        );
+        Configuration.getInstance().setUserAgentValue(getPackageName());
+
         setContentView(R.layout.activity_main);
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        mediaSessionManager = (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        listenerComponent = new ComponentName(this, CarNotificationListenerService.class);
 
+        bindViews();
+        initDefaultWazeIfInstalled();
+        setupMap();
+        setupActions();
+        refreshShortcutLabels();
+        checkLocationPermission();
+    }
+
+    private void bindViews() {
         tvClock = findViewById(R.id.tvClock);
         tvDate = findViewById(R.id.tvDate);
-        tvNavSub = findViewById(R.id.tvNavSub);
-        tvMusicSub = findViewById(R.id.tvMusicSub);
         tvPhoneSub = findViewById(R.id.tvPhoneSub);
+        tvOpenNavLabel = findViewById(R.id.tvOpenNavLabel);
+        tvSpeed = findViewById(R.id.tvSpeed);
+        tvTrackTitle = findViewById(R.id.tvTrackTitle);
+        tvTrackArtist = findViewById(R.id.tvTrackArtist);
+        btnEnableMediaAccess = findViewById(R.id.btnEnableMediaAccess);
+        imgAlbumArt = findViewById(R.id.imgAlbumArt);
+        navBanner = findViewById(R.id.navBanner);
+        tvNavInstruction = findViewById(R.id.tvNavInstruction);
+        mapView = findViewById(R.id.mapView);
+    }
 
-        initDefaultWazeIfInstalled();
-        refreshShortcutLabels();
+    private void setupMap() {
+        mapView.setTileSource(TileSourceFactory.MAPNIK);
+        mapView.setMultiTouchControls(true);
+        mapView.setBuiltInZoomControls(false);
+        mapView.getOverlayManager().getTilesOverlay().setColorFilter(TilesOverlay.INVERT_COLORS);
+        mapView.getController().setZoom(16.0);
+        mapView.getController().setCenter(new GeoPoint(45.5017, -73.5673));
 
-        // Contrôles audio Bluetooth directs via KeyEvent média
+        carMarker = new Marker(mapView);
+        carMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
+        carMarker.setTitle("Position");
+        mapView.getOverlays().add(carMarker);
+    }
+
+    private void setupActions() {
         findViewById(R.id.btnPrev).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
             }
         });
         findViewById(R.id.btnPlayPause).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
+                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
             }
         });
         findViewById(R.id.btnNext).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
+                triggerMediaAction(KeyEvent.KEYCODE_MEDIA_NEXT);
             }
         });
 
-        // 3 gros raccourcis : clic normal = lancer / appui long = choisir l'application
-        setupShortcutCard(R.id.cardNav, SLOT_NAV, getString(R.string.nav_title));
-        setupShortcutCard(R.id.cardMusic, SLOT_MUSIC, getString(R.string.music_title));
-        setupShortcutCard(R.id.cardPhone, SLOT_PHONE, getString(R.string.phone_title));
+        btnEnableMediaAccess.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    openAndroidSettings();
+                }
+            }
+        });
 
-        // Boutons discrets du bas
-        findViewById(R.id.btnAllApps).setOnClickListener(new View.OnClickListener() {
+        setupShortcutView(R.id.dockNav, SLOT_NAV, getString(R.string.nav_title));
+        setupShortcutView(R.id.btnOpenWaze, SLOT_NAV, getString(R.string.nav_title));
+        setupShortcutView(R.id.dockPhone, SLOT_PHONE, getString(R.string.phone_title));
+        setupShortcutView(R.id.cardPhone, SLOT_PHONE, getString(R.string.phone_title));
+
+        // Long click sur la carte musique pour associer une appli audio
+        findViewById(R.id.cardMusicPanel).setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                openAppPickerDialog(SLOT_MUSIC, getString(R.string.music_title));
+                return true;
+            }
+        });
+        findViewById(R.id.cardMusicPanel).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String pkg = prefs.getString(SLOT_MUSIC + KEY_PKG_SUFFIX, null);
+                if (!TextUtils.isEmpty(pkg)) {
+                    launchAssignedApp(SLOT_MUSIC, getString(R.string.music_title));
+                }
+            }
+        });
+
+        // Bouton Système voiture (retour au Launcher d'origine ou choix du Launcher par défaut)
+        View dockCarSystem = findViewById(R.id.dockCarSystem);
+        dockCarSystem.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String pkg = prefs.getString(SLOT_STOCK_HOME + KEY_PKG_SUFFIX, null);
+                if (!TextUtils.isEmpty(pkg)) {
+                    launchAssignedApp(SLOT_STOCK_HOME, getString(R.string.stock_home_title));
+                } else {
+                    openHomeLauncherChooser();
+                }
+            }
+        });
+        dockCarSystem.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                openAppPickerDialog(SLOT_STOCK_HOME, getString(R.string.stock_home_title));
+                return true;
+            }
+        });
+
+        findViewById(R.id.dockApps).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, AppDrawerActivity.class));
             }
         });
 
-        findViewById(R.id.btnSettings).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.dockSettings).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 openAndroidSettings();
@@ -128,35 +302,217 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (mapView != null) {
+            mapView.onResume();
+        }
         updateClockAndDate();
         refreshShortcutLabels();
+        startLocationUpdates();
+        setupMediaSessions();
 
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_TIME_TICK);
-        filter.addAction(Intent.ACTION_TIME_CHANGED);
-        filter.addAction(Intent.ACTION_DATE_CHANGED);
-        filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
-        registerReceiver(timeReceiver, filter);
+        IntentFilter timeFilter = new IntentFilter();
+        timeFilter.addAction(Intent.ACTION_TIME_TICK);
+        timeFilter.addAction(Intent.ACTION_TIME_CHANGED);
+        timeFilter.addAction(Intent.ACTION_DATE_CHANGED);
+        timeFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+        registerReceiver(timeReceiver, timeFilter);
+
+        IntentFilter navFilter = new IntentFilter(CarNotificationListenerService.ACTION_NAV_UPDATE);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(navReceiver, navFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(navReceiver, navFilter);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        if (mapView != null) {
+            mapView.onPause();
+        }
         try {
             unregisterReceiver(timeReceiver);
-        } catch (IllegalArgumentException ignored) {
-        }
+        } catch (IllegalArgumentException ignored) {}
+        try {
+            unregisterReceiver(navReceiver);
+        } catch (IllegalArgumentException ignored) {}
+        stopLocationUpdates();
+        teardownMediaSessions();
     }
 
     @Override
     public void onBackPressed() {
-        // Un Launcher ne quitte pas l'écran d'accueil sur le bouton Retour
+        // Launcher : ne quitte pas l'accueil sur Retour
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         executor.shutdownNow();
+    }
+
+    private void checkLocationPermission() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }, REQ_LOCATION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_LOCATION) {
+            startLocationUpdates();
+        }
+    }
+
+    private void startLocationUpdates() {
+        if (locationManager == null) return;
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        try {
+            Location lastGps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastGps != null) {
+                updateMapLocation(lastGps);
+            }
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 3f, locationListener);
+            }
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000L, 10f, locationListener);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void stopLocationUpdates() {
+        if (locationManager != null) {
+            try {
+                locationManager.removeUpdates(locationListener);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void updateMapLocation(Location location) {
+        if (location == null || mapView == null) return;
+        GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
+        carMarker.setPosition(point);
+        if (!hasCenteredOnce) {
+            mapView.getController().setCenter(point);
+            hasCenteredOnce = true;
+        } else {
+            mapView.getController().animateTo(point);
+        }
+        int kmh = location.hasSpeed() ? Math.round(location.getSpeed() * 3.6f) : 0;
+        tvSpeed.setText(String.valueOf(kmh));
+        mapView.invalidate();
+    }
+
+    private boolean isNotificationAccessEnabled() {
+        String flat = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        return flat != null && flat.contains(getPackageName());
+    }
+
+    private void setupMediaSessions() {
+        if (!isNotificationAccessEnabled()) {
+            btnEnableMediaAccess.setVisibility(View.VISIBLE);
+            return;
+        }
+        btnEnableMediaAccess.setVisibility(View.GONE);
+        if (mediaSessionManager == null) return;
+        try {
+            mediaSessionManager.addOnActiveSessionsChangedListener(sessionsListener, listenerComponent);
+            bindActiveMediaController(mediaSessionManager.getActiveSessions(listenerComponent));
+        } catch (SecurityException e) {
+            btnEnableMediaAccess.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void teardownMediaSessions() {
+        if (mediaSessionManager != null) {
+            try {
+                mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener);
+            } catch (Exception ignored) {}
+        }
+        if (activeController != null) {
+            try {
+                activeController.unregisterCallback(mediaCallback);
+            } catch (Exception ignored) {}
+            activeController = null;
+        }
+    }
+
+    private void bindActiveMediaController(List<MediaController> controllers) {
+        if (activeController != null) {
+            try {
+                activeController.unregisterCallback(mediaCallback);
+            } catch (Exception ignored) {}
+            activeController = null;
+        }
+        if (controllers != null && !controllers.isEmpty()) {
+            activeController = controllers.get(0);
+            activeController.registerCallback(mediaCallback);
+            updateMediaMetadata(activeController.getMetadata());
+        } else {
+            tvTrackTitle.setText(R.string.media_idle_title);
+            tvTrackArtist.setText(R.string.media_idle_artist);
+            imgAlbumArt.setImageResource(R.drawable.ic_music);
+            imgAlbumArt.setScaleType(ImageView.ScaleType.CENTER);
+        }
+    }
+
+    private void updateMediaMetadata(MediaMetadata metadata) {
+        if (metadata == null) return;
+        String title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE);
+        String artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST);
+        if (TextUtils.isEmpty(artist)) {
+            artist = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        }
+        Bitmap art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+        if (art == null) {
+            art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
+        }
+
+        tvTrackTitle.setText(!TextUtils.isEmpty(title) ? title : getString(R.string.media_idle_title));
+        tvTrackArtist.setText(!TextUtils.isEmpty(artist) ? artist : "");
+
+        if (art != null) {
+            imgAlbumArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            imgAlbumArt.setImageBitmap(art);
+        } else {
+            imgAlbumArt.setScaleType(ImageView.ScaleType.CENTER);
+            imgAlbumArt.setImageResource(R.drawable.ic_music);
+        }
+    }
+
+    private void triggerMediaAction(int keyCode) {
+        if (activeController != null) {
+            MediaController.TransportControls controls = activeController.getTransportControls();
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+                controls.skipToPrevious();
+                return;
+            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) {
+                controls.skipToNext();
+                return;
+            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                PlaybackState state = activeController.getPlaybackState();
+                if (state != null && state.getState() == PlaybackState.STATE_PLAYING) {
+                    controls.pause();
+                } else {
+                    controls.play();
+                }
+                return;
+            }
+        }
+        if (audioManager != null) {
+            long eventTime = SystemClock.uptimeMillis();
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0));
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0));
+        }
     }
 
     private void initDefaultWazeIfInstalled() {
@@ -173,33 +529,18 @@ public class MainActivity extends Activity {
     private void updateClockAndDate() {
         Date now = new Date();
         tvClock.setText(clockFormat.format(now));
-        String rawDate = dateFormat.format(now);
-        if (!rawDate.isEmpty()) {
-            rawDate = rawDate.substring(0, 1).toUpperCase(Locale.FRENCH) + rawDate.substring(1);
-        }
-        tvDate.setText(rawDate);
+        tvDate.setText(dateFormat.format(now));
     }
 
-    private void sendMediaKey(int keyCode) {
-        if (audioManager == null) {
-            return;
-        }
-        long eventTime = SystemClock.uptimeMillis();
-        KeyEvent downEvent = new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0);
-        KeyEvent upEvent = new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0);
-        audioManager.dispatchMediaKeyEvent(downEvent);
-        audioManager.dispatchMediaKeyEvent(upEvent);
-    }
-
-    private void setupShortcutCard(int viewId, final String slotKey, final String slotDisplayName) {
-        View card = findViewById(viewId);
-        card.setOnClickListener(new View.OnClickListener() {
+    private void setupShortcutView(int viewId, final String slotKey, final String slotDisplayName) {
+        View view = findViewById(viewId);
+        view.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 launchAssignedApp(slotKey, slotDisplayName);
             }
         });
-        card.setOnLongClickListener(new View.OnLongClickListener() {
+        view.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
                 openAppPickerDialog(slotKey, slotDisplayName);
@@ -210,12 +551,11 @@ public class MainActivity extends Activity {
 
     private void launchAssignedApp(String slotKey, String slotDisplayName) {
         String pkg = prefs.getString(slotKey + KEY_PKG_SUFFIX, null);
-        if (pkg == null || pkg.isEmpty()) {
+        if (TextUtils.isEmpty(pkg)) {
             Toast.makeText(this, R.string.no_app_assigned, Toast.LENGTH_SHORT).show();
             openAppPickerDialog(slotKey, slotDisplayName);
             return;
         }
-
         Intent launchIntent = getPackageManager().getLaunchIntentForPackage(pkg);
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -250,11 +590,8 @@ public class MainActivity extends Activity {
 
                 for (ResolveInfo ri : resolveInfos) {
                     String pkg = ri.activityInfo.packageName;
-                    if (selfPackage.equals(pkg)) {
-                        continue;
-                    }
-                    String label = ri.loadLabel(pm).toString();
-                    apps.add(new AppInfo(label, pkg, ri.loadIcon(pm)));
+                    if (selfPackage.equals(pkg)) continue;
+                    apps.add(new AppInfo(ri.loadLabel(pm).toString(), pkg, ri.loadIcon(pm)));
                 }
 
                 Collections.sort(apps, new Comparator<AppInfo>() {
@@ -267,15 +604,8 @@ public class MainActivity extends Activity {
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (isFinishing() || isDestroyed() || !dialog.isShowing()) {
-                            return;
-                        }
-                        AppListAdapter adapter = new AppListAdapter(
-                                MainActivity.this,
-                                apps,
-                                R.layout.item_app_picker
-                        );
-                        listView.setAdapter(adapter);
+                        if (isFinishing() || isDestroyed() || !dialog.isShowing()) return;
+                        listView.setAdapter(new AppListAdapter(MainActivity.this, apps, R.layout.item_app_picker));
                         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                             @Override
                             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -300,17 +630,20 @@ public class MainActivity extends Activity {
     }
 
     private void refreshShortcutLabels() {
-        updateSingleLabel(tvNavSub, SLOT_NAV);
-        updateSingleLabel(tvMusicSub, SLOT_MUSIC);
-        updateSingleLabel(tvPhoneSub, SLOT_PHONE);
+        String phoneName = prefs.getString(SLOT_PHONE + KEY_NAME_SUFFIX, null);
+        tvPhoneSub.setText(!TextUtils.isEmpty(phoneName) ? phoneName : getString(R.string.tap_to_assign));
+
+        String navName = prefs.getString(SLOT_NAV + KEY_NAME_SUFFIX, null);
+        tvOpenNavLabel.setText(!TextUtils.isEmpty(navName) ? "Ouvrir " + navName : getString(R.string.open_waze));
     }
 
-    private void updateSingleLabel(TextView target, String slotKey) {
-        String name = prefs.getString(slotKey + KEY_NAME_SUFFIX, null);
-        if (name != null && !name.isEmpty()) {
-            target.setText(name);
-        } else {
-            target.setText(R.string.tap_to_assign);
+    private void openHomeLauncherChooser() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_HOME_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            openAndroidSettings();
         }
     }
 
