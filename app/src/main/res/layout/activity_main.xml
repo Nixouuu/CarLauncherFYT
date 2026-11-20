@@ -4,13 +4,13 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_main_gradient"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:padding="14dp">
 
     <!-- Barre latérale gauche style CarPlay -->
     <LinearLayout
         android:layout_width="76dp"
         android:layout_height="match_parent"
-        android:layout_marginRight="12dp"
+        android:layout_marginRight="14dp"
         android:background="@drawable/bg_dock"
         android:gravity="center_horizontal"
         android:orientation="vertical"
@@ -36,7 +36,6 @@
             android:textColor="@color/text_secondary"
             android:textSize="11sp" />
 
-        <!-- Badge Mise à jour OTA (visible uniquement si une nouvelle version GitHub existe) -->
         <TextView
             android:id="@+id/btnOtaUpdate"
             android:layout_width="54dp"
@@ -105,252 +104,103 @@
             android:src="@drawable/ic_settings" />
     </LinearLayout>
 
-    <!-- Panneau Central : Carte GPS sombre en direct + Bandeau Waze/Maps -->
-    <FrameLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_marginRight="12dp"
-        android:layout_weight="56"
-        android:background="@drawable/bg_media_panel"
-        android:clipToOutline="true"
-        android:padding="2dp">
-
-        <org.osmdroid.views.MapView
-            android:id="@+id/mapView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <LinearLayout
-            android:id="@+id/navBanner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:layout_margin="12dp"
-            android:background="@drawable/bg_pill_overlay"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginRight="10dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav" />
-
-            <TextView
-                android:id="@+id/tvNavInstruction"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|left"
-            android:layout_margin="12dp"
-            android:background="@drawable/bg_pill_overlay"
-            android:gravity="bottom"
-            android:orientation="horizontal"
-            android:paddingLeft="14dp"
-            android:paddingTop="8dp"
-            android:paddingRight="14dp"
-            android:paddingBottom="8dp">
-
-            <TextView
-                android:id="@+id/tvSpeed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:text="0"
-                android:textColor="@color/text_primary"
-                android:textSize="24sp" />
-
-            <TextView
-                android:id="@+id/tvSpeedUnit"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="4dp"
-                android:text="@string/speed_unit"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/btnOpenWaze"
-            android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:layout_gravity="bottom|right"
-            android:layout_margin="12dp"
-            android:background="@drawable/bg_pill_overlay"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingLeft="14dp"
-            android:paddingRight="16dp">
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginRight="8dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav" />
-
-            <TextView
-                android:id="@+id/tvOpenNavLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/open_waze"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </FrameLayout>
-
-    <!-- Colonne Droite : Grand Lecteur Musique + Carte Téléphone -->
+    <!-- Colonne Centrale : Horloge + Waze + Bandeau Guidage + Téléphone -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="44"
+        android:layout_marginRight="14dp"
+        android:layout_weight="48"
         android:orientation="vertical">
 
+        <!-- Grande Carte Navigation (Ouvre le vrai Waze + affiche la prochaine direction) -->
         <LinearLayout
-            android:id="@+id/cardMusicPanel"
+            android:id="@+id/cardNav"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="14dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_media_panel"
+            android:background="@drawable/bg_card_accent_blue"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="20dp">
 
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:contentDescription="@string/nav_title"
+                android:src="@drawable/ic_nav" />
+
+            <TextView
+                android:id="@+id/tvNavTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Waze"
+                android:textColor="@color/text_primary"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvNavSub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/nav_idle_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <!-- Bandeau dynamique Waze/Maps si un guidage tourne en arrière-plan -->
             <LinearLayout
+                android:id="@+id/navBanner"
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_pill_overlay"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:visibility="gone">
 
                 <ImageView
-                    android:id="@+id/imgAlbumArt"
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:layout_marginRight="14dp"
-                    android:background="@drawable/bg_art_placeholder"
-                    android:contentDescription="@string/music_title"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_music" />
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_marginRight="10dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav" />
 
-                <LinearLayout
+                <TextView
+                    android:id="@+id/tvNavInstruction"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tvTrackTitle"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="2"
-                        android:text="@string/media_idle_title"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvTrackArtist"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:ellipsize="end"
-                        android:maxLines="2"
-                        android:text="@string/media_idle_artist"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/btnEnableMediaAccess"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:background="@drawable/bg_dock_btn"
-                        android:paddingLeft="10dp"
-                        android:paddingTop="5dp"
-                        android:paddingRight="10dp"
-                        android:paddingBottom="5dp"
-                        android:text="@string/enable_media_access"
-                        android:textColor="@color/accent_purple"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="68dp"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <ImageButton
-                    android:id="@+id/btnPrev"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginRight="10dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_media_btn"
-                    android:contentDescription="Précédent"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_prev" />
-
-                <ImageButton
-                    android:id="@+id/btnPlayPause"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginRight="10dp"
-                    android:layout_weight="1.3"
-                    android:background="@drawable/bg_media_btn"
-                    android:contentDescription="Lecture ou Pause"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_play_pause" />
-
-                <ImageButton
-                    android:id="@+id/btnNext"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_media_btn"
-                    android:contentDescription="Suivant"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_next" />
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Carte Téléphone Bluetooth -->
         <LinearLayout
             android:id="@+id/cardPhone"
             android:layout_width="match_parent"
-            android:layout_height="84dp"
+            android:layout_height="90dp"
             android:background="@drawable/bg_card_accent_green"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingLeft="18dp"
-            android:paddingRight="18dp">
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp">
 
             <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginRight="14dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginRight="16dp"
                 android:contentDescription="@string/phone_title"
                 android:src="@drawable/ic_phone" />
 
@@ -365,7 +215,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/phone_title"
                     android:textColor="@color/text_primary"
-                    android:textSize="17sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -379,6 +229,129 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
             </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Colonne Droite : Grand Lecteur Musique Complet (Pochette + Titre + Artiste + Contrôles) -->
+    <LinearLayout
+        android:id="@+id/cardMusicPanel"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="52"
+        android:background="@drawable/bg_media_panel"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/tvFullDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="Vendredi 20 novembre 2026"
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/imgAlbumArt"
+                android:layout_width="116dp"
+                android:layout_height="116dp"
+                android:layout_marginRight="18dp"
+                android:background="@drawable/bg_art_placeholder"
+                android:contentDescription="@string/music_title"
+                android:scaleType="center"
+                android:src="@drawable/ic_music" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvTrackTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/media_idle_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvTrackArtist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/media_idle_artist"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/btnEnableMediaAccess"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_dock_btn"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingRight="12dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/enable_media_access"
+                    android:textColor="@color/accent_purple"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btnPrev"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginRight="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_media_btn"
+                android:contentDescription="Précédent"
+                android:scaleType="center"
+                android:src="@drawable/ic_prev" />
+
+            <ImageButton
+                android:id="@+id/btnPlayPause"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginRight="12dp"
+                android:layout_weight="1.3"
+                android:background="@drawable/bg_media_btn"
+                android:contentDescription="Lecture ou Pause"
+                android:scaleType="center"
+                android:src="@drawable/ic_play_pause" />
+
+            <ImageButton
+                android:id="@+id/btnNext"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_media_btn"
+                android:contentDescription="Suivant"
+                android:scaleType="center"
+                android:src="@drawable/ic_next" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

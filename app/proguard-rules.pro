@@ -1,2 +1,1 @@
 -keepattributes SourceFile,LineNumberTable
--dontwarn org.osmdroid.**

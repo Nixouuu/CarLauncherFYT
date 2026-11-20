@@ -21,20 +21,9 @@ public class AppListAdapter extends BaseAdapter {
         this.layoutResId = layoutResId;
     }
 
-    @Override
-    public int getCount() {
-        return apps.size();
-    }
-
-    @Override
-    public AppInfo getItem(int position) {
-        return apps.get(position);
-    }
-
-    @Override
-    public long getItemId(int position) {
-        return position;
-    }
+    @Override public int getCount() { return apps.size(); }
+    @Override public AppInfo getItem(int position) { return apps.get(position); }
+    @Override public long getItemId(int position) { return position; }
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {

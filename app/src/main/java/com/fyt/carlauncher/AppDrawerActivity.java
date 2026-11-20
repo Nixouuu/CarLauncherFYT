@@ -32,10 +32,7 @@ public class AppDrawerActivity extends Activity {
 
         gridApps = findViewById(R.id.gridApps);
         findViewById(R.id.btnBackHome).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
+            @Override public void onClick(View v) { finish(); }
         });
 
         loadInstalledApps();

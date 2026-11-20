@@ -14,10 +14,7 @@ public class ApkFileProvider extends ContentProvider {
     public static final Uri UPDATE_APK_URI =
             Uri.parse("content://com.fyt.carlauncher.apkprovider/update.apk");
 
-    @Override
-    public boolean onCreate() {
-        return true;
-    }
+    @Override public boolean onCreate() { return true; }
 
     @Override
     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
@@ -28,28 +25,9 @@ public class ApkFileProvider extends ContentProvider {
         return ParcelFileDescriptor.open(apkFile, ParcelFileDescriptor.MODE_READ_ONLY);
     }
 
-    @Override
-    public String getType(Uri uri) {
-        return "application/vnd.android.package-archive";
-    }
-
-    @Override
-    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        return null;
-    }
-
-    @Override
-    public Uri insert(Uri uri, ContentValues values) {
-        return null;
-    }
-
-    @Override
-    public int delete(Uri uri, String selection, String[] selectionArgs) {
-        return 0;
-    }
-
-    @Override
-    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        return 0;
-    }
+    @Override public String getType(Uri uri) { return "application/vnd.android.package-archive"; }
+    @Override public Cursor query(Uri uri, String[] p, String s, String[] sa, String so) { return null; }
+    @Override public Uri insert(Uri uri, ContentValues v) { return null; }
+    @Override public int delete(Uri uri, String s, String[] sa) { return 0; }
+    @Override public int update(Uri uri, ContentValues v, String s, String[] sa) { return 0; }
 }

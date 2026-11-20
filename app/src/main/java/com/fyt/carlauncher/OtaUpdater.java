@@ -103,9 +103,7 @@ public class OtaUpdater {
                     FileOutputStream out = new FileOutputStream(outFile);
                     byte[] buf = new byte[8192];
                     int n;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                    }
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
                     out.flush();
                     out.close();
                     in.close();
