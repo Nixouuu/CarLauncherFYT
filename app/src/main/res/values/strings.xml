@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CarLauncher FYT</string>
     <string name="nav_title">Navigation</string>
@@ -15,5 +15,5 @@
     <string name="no_app_assigned">Aucune application associée. Choisissez-en une.</string>
     <string name="app_not_found">Application introuvable. Veuillez la réassocier.</string>
     <string name="app_assigned">« %1$s » associée à %2$s</string>
-    <string name="settings_error">Impossible d'ouvrir les paramètres Android.</string>
+    <string name="settings_error">Impossible d\'ouvrir les paramètres Android.</string>
 </resources>
