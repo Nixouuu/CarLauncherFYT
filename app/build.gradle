@@ -3,7 +3,7 @@ plugins {
 }
 
 def verCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : 4
-def verName = project.hasProperty('appVersionName') ? project.property('appVersionName').toString() : "2.3"
+def verName = project.hasProperty('appVersionName') ? project.property('appVersionName').toString() : "2.4"
 
 android {
     namespace 'com.fyt.carlauncher'

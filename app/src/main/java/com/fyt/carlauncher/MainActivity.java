@@ -67,21 +67,19 @@ public class MainActivity extends Activity {
     private static final String KEY_NAME_SUFFIX = "_name";
     private static final String DEFAULT_WAZE_PKG = "com.waze";
 
-    private static final OnlineTileSourceBase DARK_MATTER_TILES = new OnlineTileSourceBase(
-            "CartoDarkMatter",
-            0, 19, 256, ".png",
+    private static final OnlineTileSourceBase ESRI_STREET_TILES = new OnlineTileSourceBase(
+            "EsriWorldStreetMap",
+            0, 19, 256, "",
             new String[]{
-                    "https://a.basemaps.cartocdn.com/dark_all/",
-                    "https://b.basemaps.cartocdn.com/dark_all/",
-                    "https://c.basemaps.cartocdn.com/dark_all/"
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/"
             }
     ) {
         @Override
         public String getTileURLString(long pMapTileIndex) {
             return getBaseUrl()
                     + MapTileIndex.getZoom(pMapTileIndex) + "/"
-                    + MapTileIndex.getX(pMapTileIndex) + "/"
-                    + MapTileIndex.getY(pMapTileIndex) + mImageFilenameEnding;
+                    + MapTileIndex.getY(pMapTileIndex) + "/"
+                    + MapTileIndex.getX(pMapTileIndex);
         }
     };
 
@@ -166,7 +164,10 @@ public class MainActivity extends Activity {
                 getApplicationContext(),
                 PreferenceManager.getDefaultSharedPreferences(getApplicationContext())
         );
-        Configuration.getInstance().setUserAgentValue("CarLauncherFYT/2.3");
+        Configuration.getInstance().setUserAgentValue("CarLauncherFYT/2.4");
+        java.io.File osmBase = new java.io.File(getCacheDir(), "osmdroid");
+        Configuration.getInstance().setOsmdroidBasePath(osmBase);
+        Configuration.getInstance().setOsmdroidTileCache(new java.io.File(osmBase, "tiles"));
 
         setContentView(R.layout.activity_main);
 
@@ -212,7 +213,7 @@ public class MainActivity extends Activity {
     }
 
     private void setupMap() {
-        mapView.setTileSource(DARK_MATTER_TILES);
+        mapView.setTileSource(ESRI_STREET_TILES);
         mapView.setMultiTouchControls(true);
         mapView.setBuiltInZoomControls(false);
         mapView.getController().setZoom(16.5);
