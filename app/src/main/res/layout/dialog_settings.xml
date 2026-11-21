@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="24dp"
+        android:paddingTop="8dp"
+        android:paddingRight="24dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/settings_sound_section"
+            android:textAllCaps="true"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <Switch
+            android:id="@+id/swSoundEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:soundEffectsEnabled="false"
+            android:text="@string/settings_sound_enabled"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp" />
+
+        <LinearLayout
+            android:id="@+id/rowVolume"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@string/settings_sound_volume"
+                android:src="@drawable/ic_volume" />
+
+            <SeekBar
+                android:id="@+id/seekSoundVolume"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp" />
+
+            <TextView
+                android:id="@+id/btnSoundTest"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_chip"
+                android:gravity="center"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:soundEffectsEnabled="false"
+                android:text="@string/settings_sound_test"
+                android:textColor="@color/accent_blue"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/swSoundAdaptive"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:soundEffectsEnabled="false"
+            android:text="@string/settings_sound_adaptive"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:text="@string/settings_sound_adaptive_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/btnMusicApp"
+            style="@style/SettingsRow"
+            android:text="@string/settings_music_app" />
+
+        <TextView
+            android:id="@+id/btnHomeApp"
+            style="@style/SettingsRow"
+            android:text="@string/settings_home_app" />
+
+        <TextView
+            android:id="@+id/btnAndroidSettings"
+            style="@style/SettingsRow"
+            android:text="@string/settings_android" />
+    </LinearLayout>
+</ScrollView>

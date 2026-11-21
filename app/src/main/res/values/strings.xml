@@ -6,20 +6,39 @@
     <string name="music_title">Musique</string>
     <string name="phone_title">Téléphone</string>
     <string name="stock_home_title">Système voiture</string>
+    <string name="settings_title">Réglages</string>
     <string name="open_waze">Waze</string>
-    <string name="media_idle_title">Aucune lecture en cours</string>
-    <string name="media_idle_artist">Bluetooth ou application audio</string>
-    <string name="enable_media_access">Activer pochettes et titres</string>
+    <string name="media_idle_title">Rien en lecture</string>
+    <string name="media_idle_artist">Appuyez sur lecture pour démarrer la musique</string>
+    <string name="enable_media_access">Afficher titres et pochettes</string>
     <string name="tap_to_assign">Appui long pour associer</string>
-    <string name="drawer_title">Toutes les applications</string>
-    <string name="back_home">Retour Hub</string>
+    <string name="drawer_title">Applications</string>
+    <string name="back_home">Accueil</string>
     <string name="picker_title">Associer une application à « %1$s »</string>
     <string name="no_app_assigned">Aucune application associée. Choisissez-en une.</string>
     <string name="app_not_found">Application introuvable. Veuillez la réassocier.</string>
     <string name="app_assigned">« %1$s » associée à %2$s</string>
     <string name="launcher_settings_error">Ouverture des paramètres Android impossible.</string>
     <string name="speed_unit">km/h</string>
+    <string name="speed_none">--</string>
     <string name="update_available">MÀJ</string>
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_failed">Échec du téléchargement de la mise à jour.</string>
+    <string name="update_allow_install">Autorisez l\'installation d\'applications pour CarLauncher, puis réessayez.</string>
+    <string name="map_attribution">© les contributeurs d’OpenStreetMap</string>
+    <string name="recenter">Recentrer</string>
+    <string name="music_starting">Démarrage de %1$s…</string>
+    <string name="music_no_app">Appui long sur la carte musique pour choisir l\'application.</string>
+
+    <!-- Réglages du launcher -->
+    <string name="settings_sound_section">Son des touches</string>
+    <string name="settings_sound_enabled">Son au toucher</string>
+    <string name="settings_sound_volume">Volume du son</string>
+    <string name="settings_sound_adaptive">Adapter au volume de la musique</string>
+    <string name="settings_sound_adaptive_hint">Plus discret quand la musique est forte, plus audible quand elle est basse</string>
+    <string name="settings_sound_test">Tester</string>
+    <string name="settings_music_app">Application musique</string>
+    <string name="settings_home_app">Changer d\'application d\'accueil</string>
+    <string name="settings_android">Paramètres Android</string>
+    <string name="settings_close">Fermer</string>
 </resources>

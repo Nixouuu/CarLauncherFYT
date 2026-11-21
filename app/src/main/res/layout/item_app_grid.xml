@@ -2,16 +2,16 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_bottom_btn"
+    android:background="@drawable/bg_list_item"
     android:gravity="center"
-    android:minHeight="104dp"
+    android:minHeight="112dp"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:padding="8dp">
 
     <ImageView
         android:id="@+id/imgAppIcon"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
+        android:layout_width="62dp"
+        android:layout_height="62dp"
         android:contentDescription="@null" />
 
     <TextView
@@ -21,7 +21,7 @@
         android:layout_marginTop="8dp"
         android:ellipsize="end"
         android:gravity="center"
-        android:maxLines="2"
+        android:maxLines="1"
         android:textColor="@color/text_primary"
         android:textSize="13sp" />
 </LinearLayout>

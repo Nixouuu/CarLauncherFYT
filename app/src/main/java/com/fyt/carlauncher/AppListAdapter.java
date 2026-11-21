@@ -1,6 +1,7 @@
 package com.fyt.carlauncher;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,6 +31,7 @@ public class AppListAdapter extends BaseAdapter {
         ViewHolder holder;
         if (convertView == null) {
             convertView = inflater.inflate(layoutResId, parent, false);
+            convertView.setSoundEffectsEnabled(false);
             holder = new ViewHolder();
             holder.icon = convertView.findViewById(R.id.imgAppIcon);
             holder.name = convertView.findViewById(R.id.tvAppName);
@@ -40,7 +42,9 @@ public class AppListAdapter extends BaseAdapter {
         }
 
         AppInfo info = apps.get(position);
-        holder.icon.setImageDrawable(info.icon);
+        // Les icônes sont partagées via le cache : une copie légère par vue évite les conflits de bornes.
+        Drawable.ConstantState cs = info.icon != null ? info.icon.getConstantState() : null;
+        holder.icon.setImageDrawable(cs != null ? cs.newDrawable() : info.icon);
         holder.name.setText(info.label);
         if (holder.pkg != null) {
             holder.pkg.setText(info.packageName);

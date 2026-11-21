@@ -3,8 +3,11 @@ package com.fyt.carlauncher;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -83,51 +86,56 @@ public class OtaUpdater {
         });
     }
 
-    public static void downloadAndInstall(final Context context, ExecutorService executor, final String apkUrl) {
+    public static void downloadAndInstall(Context activityContext, ExecutorService executor, final String apkUrl) {
+        final Context context = activityContext.getApplicationContext();
+
+        // Android 8+ : l'utilisateur doit autoriser CarLauncher à installer des applications.
+        if (Build.VERSION.SDK_INT >= 26 && !context.getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(context, R.string.update_allow_install, Toast.LENGTH_LONG).show();
+            try {
+                context.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + context.getPackageName()))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+
         Toast.makeText(context, R.string.update_downloading, Toast.LENGTH_SHORT).show();
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                HttpURLConnection conn = null;
-                try {
-                    URL url = new URL(apkUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(8000);
-                    conn.setReadTimeout(20000);
-                    conn.setInstanceFollowRedirects(true);
-
-                    File outFile = new File(context.getCacheDir(), "update.apk");
-                    if (outFile.exists()) outFile.delete();
-
-                    InputStream in = conn.getInputStream();
-                    FileOutputStream out = new FileOutputStream(outFile);
+        executor.execute(() -> {
+            final Handler main = new Handler(Looper.getMainLooper());
+            File outFile = new File(context.getCacheDir(), "update.apk");
+            File partFile = new File(context.getCacheDir(), "update.apk.part");
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(apkUrl).openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(20000);
+                conn.setInstanceFollowRedirects(true);
+                if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                    throw new java.io.IOException("HTTP " + conn.getResponseCode());
+                }
+                try (InputStream in = conn.getInputStream();
+                     FileOutputStream out = new FileOutputStream(partFile)) {
                     byte[] buf = new byte[8192];
                     int n;
                     while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                    out.flush();
-                    out.close();
-                    in.close();
-
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            Intent install = new Intent(Intent.ACTION_VIEW);
-                            install.setDataAndType(ApkFileProvider.UPDATE_APK_URI,
-                                    "application/vnd.android.package-archive");
-                            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                            context.startActivity(install);
-                        }
-                    });
-                } catch (Exception e) {
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(context, R.string.update_failed, Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                } finally {
-                    if (conn != null) conn.disconnect();
                 }
+                if (outFile.exists() && !outFile.delete()) throw new java.io.IOException("delete");
+                if (!partFile.renameTo(outFile)) throw new java.io.IOException("rename");
+
+                main.post(() -> {
+                    Intent install = new Intent(Intent.ACTION_VIEW);
+                    install.setDataAndType(ApkFileProvider.UPDATE_APK_URI,
+                            "application/vnd.android.package-archive");
+                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(install);
+                });
+            } catch (Exception e) {
+                partFile.delete();
+                main.post(() -> Toast.makeText(context, R.string.update_failed, Toast.LENGTH_SHORT).show());
+            } finally {
+                if (conn != null) conn.disconnect();
             }
         });
     }

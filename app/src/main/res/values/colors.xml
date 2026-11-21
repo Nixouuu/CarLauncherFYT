@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_primary">#07090E</color>
-    <color name="bg_secondary">#10141E</color>
-    <color name="text_primary">#F8FAFC</color>
-    <color name="text_secondary">#94A3B8</color>
-    <color name="text_muted">#64748B</color>
-    <color name="accent_blue">#38BDF8</color>
-    <color name="accent_purple">#A78BFA</color>
-    <color name="accent_green">#34D399</color>
-    <color name="accent_amber">#FBBF24</color>
+    <!-- Palette sombre inspirée de CarPlay / iOS -->
+    <color name="bg_primary">#000000</color>
+    <color name="bg_card">#1C1C1E</color>
+    <color name="bg_elevated">#2C2C2E</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8E8E93</color>
+    <color name="text_muted">#636366</color>
+    <color name="accent_blue">#0A84FF</color>
+    <color name="accent_green">#30D158</color>
+    <color name="accent_red">#FF453A</color>
+    <color name="accent_pink">#FA2D48</color>
 </resources>
