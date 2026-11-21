@@ -23,7 +23,7 @@ android {
                 storeFile file("release.keystore")
                 storePassword System.getenv("KEYSTORE_PASS") ?: "carlauncher"
                 keyAlias System.getenv("KEY_ALIAS") ?: "carlauncher"
-                keyPassword System.getenv("KEY_PASS") ?: "carlauncher"
+                keyPassword System.getenv("KEY_PASS") ?: System.getenv("KEYSTORE_PASS") ?: "carlauncher"
             }
         }
     }
