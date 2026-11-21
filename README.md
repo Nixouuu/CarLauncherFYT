@@ -20,4 +20,4 @@ Launcher Android natif ultra-léger conçu spécifiquement pour les autoradios c
 5. Copiez `CarLauncherFYT.apk` sur une clé USB, installez-le sur l'autoradio et sélectionnez **CarLauncher FYT** comme application d'accueil par défaut dans *Paramètres Android > Applications > Applications par défaut > Application d'accueil*.
 
 ## Aperçu
-Maquettes 1024x600 : `docs/preview/` (`home.png`, `drawer.png`, `settings.png`, `picker.png`). Source : `docs/preview/home.html` (ouvrir avec `#drawer`, `#settings` ou `#picker`).
+Maquettes 1024x600 dans `docs/preview/` : accueil, navigation, recherche, appel entrant, en appel, téléphone, réglages, sélecteur, tiroir. Source `docs/preview/home.html` (ajouter `#nav`, `#phone`, etc. ; `?key=CLE_STADIA` pour la carte Stadia).

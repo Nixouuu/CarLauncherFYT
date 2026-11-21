@@ -100,6 +100,56 @@
   .icon { width: 62px; height: 62px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 500; color: #fff; }
   .app span { font-size: 13px; margin-top: 8px; }
 
+  /* ---- Navigation ---- */
+  .navbar { position: absolute; left: 106px; right: 10px; bottom: 10px; height: 56px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 16px; }
+  .navbar .eta { flex: 1; font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .navbar .stop { background: #FF453A; border-radius: 22px; padding: 12px 16px; font-size: 15px; }
+  .searchpanel { position: absolute; inset: 0; background: rgba(28,28,30,.95); padding: 12px; }
+  .sbar { display: flex; gap: 8px; height: 52px; }
+  .sinput { flex: 1; background: #2C2C2E; border-radius: 14px; display: flex; align-items: center; gap: 10px; padding-left: 14px; font-size: 18px; }
+  .sinput svg { width: 22px; height: 22px; fill: #8E8E93; }
+  .caret { display: inline-block; width: 2px; height: 22px; background: #0A84FF; margin-left: 2px; vertical-align: middle; }
+  .sclose { width: 52px; border-radius: 50%; background: #2C2C2E; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .shint { font-size: 12px; color: #8E8E93; text-transform: uppercase; padding: 12px 6px 4px; }
+  .place { height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 6px; }
+  .place .pi { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(#5AC8FA, #0A84FF); display: flex; align-items: center; justify-content: center; flex: none; }
+  .place .pi svg { width: 22px; height: 22px; fill: #fff; }
+  .place .pn { font-size: 17px; font-weight: 500; }
+  .place .pl { font-size: 13px; color: #8E8E93; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .place .chip { font-size: 14px; padding: 10px 12px; margin-left: auto; flex: none; }
+
+  /* ---- Appel ---- */
+  .call { background: #000; padding: 60px 24px 24px; }
+  .call .who, .call .ctl { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .avatar { width: 132px; height: 132px; border-radius: 50%; background: linear-gradient(#8E8E93, #48484A); display: flex; align-items: center; justify-content: center; font-size: 54px; font-weight: 500; }
+  .call .cn { font-size: 34px; font-weight: 500; margin-top: 22px; }
+  .call .cnum { font-size: 18px; color: #8E8E93; margin-top: 4px; }
+  .call .cst { font-size: 20px; font-weight: 500; color: #30D158; margin-top: 10px; }
+  .round { border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .round svg { fill: #fff; }
+  .clabel { font-size: 15px; color: #8E8E93; margin-top: 10px; text-align: center; }
+  .crow { display: flex; gap: 40px; align-items: flex-start; }
+
+  /* ---- Téléphone ---- */
+  .phonescr { background: #000; padding: 48px 20px 12px; flex-direction: column; }
+  .phonescr .head { height: 52px; display: flex; align-items: center; gap: 16px; }
+  .phonescr .head h1 { font-size: 24px; font-weight: 500; }
+  .phonescr .head .st { flex: 1; font-size: 14px; color: #8E8E93; }
+  .pcols { flex: 1; display: flex; gap: 12px; margin-top: 8px; min-height: 0; }
+  .pad { flex: 46; background: #1C1C1E; border-radius: 20px; padding: 12px; display: flex; flex-direction: column; align-items: center; }
+  .num { height: 52px; width: 100%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 300; position: relative; }
+  .num .bs { position: absolute; right: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+  .keys { display: grid; grid-template-columns: repeat(3, 62px); gap: 8px 22px; margin-top: 6px; }
+  .key { width: 62px; height: 62px; border-radius: 50%; background: #2C2C2E; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; line-height: 1; }
+  .key small { font-size: 9px; color: #8E8E93; letter-spacing: .08em; margin-top: 2px; }
+  .contacts { flex: 54; background: #1C1C1E; border-radius: 20px; padding: 12px; overflow: hidden; }
+  .crow2 { height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 8px; }
+  .crow2 .av { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(#8E8E93, #48484A); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 500; flex: none; }
+  .crow2 .cn2 { font-size: 17px; font-weight: 500; }
+  .crow2 .cp { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+  .crow2 .go { width: 40px; height: 40px; border-radius: 50%; background: #30D158; margin-left: auto; display: flex; align-items: center; justify-content: center; }
+  .crow2 .go svg { width: 22px; height: 22px; fill: #fff; }
+
   .plist { max-height: 380px; overflow: hidden; }
   .pitem { height: 60px; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
   .pitem.sel { background: rgba(255,255,255,.08); border-radius: 12px; }
@@ -126,14 +176,28 @@
 
   <div class="map" id="map">
     <div class="tiles" id="tiles"></div>
-    <svg class="car" viewBox="0 0 44 44"><path fill="#330A84FF" d="M22,2a20,20 0,1 1,0 40a20,20 0,1 1,0 -40z" style="fill:rgba(10,132,255,.2)"/><path fill="#fff" d="M22,9a13,13 0,1 1,0 26a13,13 0,1 1,0 -26z"/><path fill="#0A84FF" d="M22,13l7,16l-7,-4l-7,4z"/></svg>
-    <div class="banner">
-      <svg viewBox="0 0 24 24"><path d="M21.71,3.71a1,1 0,0 0,-1.08 -0.22l-17,7a1,1 0,0 0,0.1 1.88l7.06,2.1 2.1,7.06a1,1 0,0 0,0.93 0.71h0.03a1,1 0,0 0,0.92 -0.62l7,-17a1,1 0,0 0,-0.06 -0.91z"/></svg>
-      <div class="t">Tournez à droite • 300 m<br>Rue Sherbrooke Ouest</div>
+    <svg id="routeSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+    <svg class="car" id="car" viewBox="0 0 44 44"><path d="M22,2a20,20 0,1 1,0 40a20,20 0,1 1,0 -40z" style="fill:rgba(10,132,255,.2)"/><path fill="#fff" d="M22,9a13,13 0,1 1,0 26a13,13 0,1 1,0 -26z"/><path fill="#0A84FF" d="M22,13l7,16l-7,-4l-7,4z"/></svg>
+    <div class="banner" id="navBanner" style="display:none">
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:64px">
+        <svg id="navArrow" viewBox="0 0 24 24" style="width:44px;height:44px"><path d="M12,2.5l7,8.2h-4.6V21.5h-4.8V10.7H5z"/></svg>
+        <div style="font-size:18px;font-weight:500">300 m</div>
+      </div>
+      <div class="t" style="font-size:20px">Prenez la sortie 136 Est sur la gauche vers Autoroute Ville-Marie.</div>
     </div>
     <div class="overlay speed"><div class="v">52</div><div class="u">km/h</div></div>
-    <div class="overlay waze"><svg viewBox="0 0 24 24"><path d="M21.71,3.71a1,1 0,0 0,-1.08 -0.22l-17,7a1,1 0,0 0,0.1 1.88l7.06,2.1 2.1,7.06a1,1 0,0 0,0.93 0.71h0.03a1,1 0,0 0,0.92 -0.62l7,-17a1,1 0,0 0,-0.06 -0.91z"/></svg>Waze</div>
-    <div class="attrib">© les contributeurs d’OpenStreetMap</div>
+    <div class="overlay waze" id="searchBtn"><svg viewBox="0 0 24 24" style="fill:#8E8E93;width:22px;height:22px"><path d="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/></svg>Où aller ?</div>
+    <div class="overlay navbar" id="navBar" style="display:none">
+      <div class="eta">Arrivée 18:43 · 8 min · 3,1 km</div>
+      <div class="chip" style="font-size:15px;padding:12px 14px">Waze</div>
+      <div class="stop">Arrêter</div>
+    </div>
+    <div class="searchpanel" id="searchPanel" style="display:none">
+      <div class="sbar"><div class="sinput"><svg viewBox="0 0 24 24"><path d="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/></svg><span>Vieux-Port<i class="caret"></i></span></div><div class="sclose">✕</div></div>
+      <div class="shint">Résultats</div>
+      <div id="places"></div>
+    </div>
+    <div class="attrib" id="attrib">© les contributeurs d’OpenStreetMap</div>
   </div>
 
   <div class="right">
@@ -141,7 +205,7 @@
       <div class="track">
         <div class="art"></div>
         <div class="meta">
-          <div class="src">Apple Music</div>
+          <div class="src">Bluetooth · iPhone</div>
           <div class="title">Titre de la chanson</div>
           <div class="artist">Nom de l'artiste</div>
         </div>
@@ -157,7 +221,7 @@
     <div class="bottom">
       <div class="card phonecard">
         <div class="tile phone ic"><svg viewBox="0 0 24 24"><path d="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z"/></svg></div>
-        <div><div class="n">Téléphone</div><div class="s">Bluetooth</div></div>
+        <div><div class="n">Téléphone</div><div class="s">iPhone de Max</div></div>
       </div>
       <div class="card date"><div class="d">Jeudi</div><div class="n">20 nov.</div></div>
     </div>
@@ -196,22 +260,108 @@
   <div class="head"><h1>Applications</h1><div class="chip" style="font-size:16px;padding:11px 20px">Accueil</div></div>
   <div class="grid" id="grid"></div>
 </div>
+<!-- Appel entrant (s'ouvre tout seul) -->
+<div class="screen call" id="s-call">
+  <div class="who"><div class="avatar">J</div><div class="cn">Julie</div><div class="cnum">514 555-0142</div><div class="cst">Appel entrant…</div></div>
+  <div class="ctl"><div class="crow" style="gap:72px">
+    <div><div class="round" style="width:96px;height:96px;background:#FF453A"><svg viewBox="0 0 24 24" style="width:40px;height:40px"><path d="M12,9c-1.6,0 -3.15,0.25 -4.6,0.72v3.1c0,0.39 -0.23,0.74 -0.56,0.9 -0.98,0.49 -1.87,1.12 -2.66,1.85 -0.18,0.18 -0.43,0.28 -0.7,0.28 -0.28,0 -0.53,-0.11 -0.71,-0.29L0.29,13.08c-0.18,-0.17 -0.29,-0.42 -0.29,-0.7 0,-0.28 0.11,-0.53 0.29,-0.71C3.34,8.78 7.46,7 12,7s8.66,1.78 11.71,4.67c0.18,0.18 0.29,0.43 0.29,0.71 0,0.28 -0.11,0.53 -0.29,0.71l-2.48,2.48c-0.18,0.18 -0.43,0.29 -0.71,0.29 -0.27,0 -0.52,-0.11 -0.7,-0.28 -0.79,-0.74 -1.69,-1.36 -2.67,-1.85 -0.33,-0.16 -0.56,-0.5 -0.56,-0.9v-3.1C15.15,9.25 13.6,9 12,9z"/></svg></div><div class="clabel">Refuser</div></div>
+    <div><div class="round" style="width:96px;height:96px;background:#30D158"><svg viewBox="0 0 24 24" style="width:36px;height:36px"><path d="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z"/></svg></div><div class="clabel">Répondre</div></div>
+  </div></div>
+</div>
+
+<!-- En appel -->
+<div class="screen call" id="s-incall">
+  <div class="who"><div class="avatar">J</div><div class="cn">Julie</div><div class="cnum">514 555-0142</div><div class="cst">2:14</div></div>
+  <div class="ctl">
+    <div class="crow">
+      <div><div class="round" style="width:84px;height:84px;background:#2C2C2E"><svg viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M12,19c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM6,1c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM6,7c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM6,13c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,5c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,13c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,13c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,7c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,7c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,1c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/></svg></div><div class="clabel">Clavier</div></div>
+      <div><div class="round" style="width:84px;height:84px;background:#2C2C2E"><svg viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M17,1.01L7,1c-1.1,0 -2,0.9 -2,2v18c0,1.1 0.9,2 2,2h10c1.1,0 2,-0.9 2,-2V3c0,-1.1 -0.9,-1.99 -2,-1.99zM17,19H7V5h10v14z"/></svg></div><div class="clabel">Sur le téléphone</div></div>
+    </div>
+    <div class="round" style="width:96px;height:96px;background:#FF453A;margin-top:34px"><svg viewBox="0 0 24 24" style="width:40px;height:40px"><path d="M12,9c-1.6,0 -3.15,0.25 -4.6,0.72v3.1c0,0.39 -0.23,0.74 -0.56,0.9 -0.98,0.49 -1.87,1.12 -2.66,1.850 -0.18,0.18 -0.43,0.28 -0.7,0.28 -0.28,0 -0.53,-0.11 -0.71,-0.29L0.29,13.08c-0.18,-0.17 -0.29,-0.42 -0.29,-0.7 0,-0.28 0.11,-0.53 0.29,-0.71C3.34,8.78 7.46,7 12,7s8.66,1.78 11.71,4.67c0.18,0.18 0.29,0.43 0.29,0.71 0,0.28 -0.11,0.53 -0.29,0.71l-2.48,2.48c-0.18,0.18 -0.43,0.29 -0.71,0.29 -0.27,0 -0.52,-0.11 -0.7,-0.28 -0.79,-0.74 -1.69,-1.36 -2.67,-1.85 -0.33,-0.16 -0.56,-0.5 -0.56,-0.9v-3.1C15.15,9.25 13.6,9 12,9z"/></svg></div>
+  </div>
+</div>
+
+<!-- Écran Téléphone (bouton vert du dock) -->
+<div class="screen phonescr" id="s-phone">
+  <div class="head"><h1>Téléphone</h1><div class="st">Connecté à iPhone de Max</div><div class="chip" style="font-size:16px;padding:11px 20px">Accueil</div></div>
+  <div class="pcols">
+    <div class="pad">
+      <div class="num">514 555<span class="bs"><svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:#fff"><path d="M22,3H7c-0.69,0 -1.23,0.35 -1.59,0.88L0,12l5.41,8.11c0.36,0.53 0.9,0.89 1.59,0.89h15c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2zM19,15.59L17.59,17 14,13.41 10.41,17 9,15.59 12.59,12 9,8.41 10.41,7 14,10.59 17.59,7 19,8.41 15.41,12 19,15.59z"/></svg></span></div>
+      <div class="keys" id="keys"></div>
+      <div class="round" style="width:68px;height:68px;background:#30D158;margin-top:10px"><svg viewBox="0 0 24 24" style="width:30px;height:30px"><path d="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z"/></svg></div>
+    </div>
+    <div class="contacts">
+      <div class="sbar" style="height:48px"><div class="sinput" style="font-size:17px;color:#636366"><svg viewBox="0 0 24 24"><path d="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/></svg>Rechercher un contact</div><div class="sclose" style="width:48px;color:#0A84FF">⟳</div></div>
+      <div id="clist" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<script src="route.js"></script>
 <script>
-  // Vraies tuiles OpenStreetMap, filtre sombre identique à celui de l app (LiveMap), zoom 16, Montréal.
-  const z = 16, lat = 45.5017, lon = -73.5673, n = 2 ** z, T = 300;
-  const fx = (lon + 180) / 360 * n;
-  const r = lat * Math.PI / 180;
-  const fy = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
+  // Carte : tuiles Stadia « Alidade Smooth Dark » (comme l'app) si ?key=… est passé dans l'URL,
+  // sinon OpenStreetMap assombri (le repli de l'app). La clé n'est jamais écrite dans ce fichier.
+  const KEY = new URLSearchParams(location.search).get('key');
+  const which = location.hash.slice(1);
+  const nav = which === 'nav';
   const map = document.getElementById('map'), tiles = document.getElementById('tiles');
   const W = map.clientWidth, H = map.clientHeight;
-  const x0 = Math.floor(fx) - 1, y0 = Math.floor(fy) - 1;
-  for (let y = y0; y < y0 + 4; y++) for (let x = x0; x < x0 + 4; x++) {
+  const R = window.ROUTE || [];
+  const carPt = nav && R.length ? R[24] : [45.5017, -73.5673];
+  const z = nav ? 16 : 16, n = 2 ** z, T = KEY ? 384 : 300;
+  const proj = (la, lo) => {
+    const r = la * Math.PI / 180;
+    return [(lo + 180) / 360 * n, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n];
+  };
+  const [fx, fy] = proj(carPt[0], carPt[1]);
+  // En navigation, la voiture est un peu plus bas que le centre (on voit plus loin devant).
+  const cx = W / 2, cy = nav ? H * 0.62 : H / 2;
+  const x0 = Math.floor(fx - cx / T) - 1, y0 = Math.floor(fy - cy / T) - 1;
+  const cols = Math.ceil(W / T) + 3, rows = Math.ceil(H / T) + 3;
+  tiles.style.gridTemplateColumns = `repeat(${cols}, ${T}px)`;
+  if (KEY) { tiles.style.filter = 'none'; document.getElementById('attrib').textContent = '© Stadia Maps © OpenMapTiles © OpenStreetMap'; }
+  for (let y = y0; y < y0 + rows; y++) for (let x = x0; x < x0 + cols; x++) {
     const img = new Image();
-    img.src = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+    img.style.width = img.style.height = T + 'px';
+    img.src = KEY ? `https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/${z}/${x}/${y}@2x.png?api_key=${KEY}`
+                  : `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
     tiles.appendChild(img);
   }
-  tiles.style.left = (W / 2 - (fx - x0) * T) + 'px';
-  tiles.style.top = (H / 2 - (fy - y0) * T) + 'px';
+  tiles.style.left = (cx - (fx - x0) * T) + 'px';
+  tiles.style.top = (cy - (fy - y0) * T) + 'px';
+  const car = document.getElementById('car');
+  car.style.top = cy + 'px';
+
+  if (nav && R.length) {
+    const toPx = (p) => { const [x, y] = proj(p[0], p[1]); return [cx + (x - fx) * T, cy + (y - fy) * T]; };
+    const pts = R.slice(24).map(p => toPx(p).map(v => v.toFixed(1)).join(',')).join(' ');
+    document.getElementById('routeSvg').innerHTML =
+      `<polyline points="${pts}" fill="none" stroke="#0A4F9E" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<polyline points="${pts}" fill="none" stroke="#0A84FF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const a = toPx(R[24]); let b = a; for (let j = 25; j < R.length; j++) { b = toPx(R[j]); if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 25) break; }
+    car.style.transform = "translate(-50%,-50%) rotate(" + (Math.atan2(b[0] - a[0], a[1] - b[1]) * 180 / Math.PI + 180) % 360 + "deg)";
+    document.getElementById('navBanner').style.display = 'flex';
+    document.getElementById('navArrow').style.transform = 'rotate(-45deg)';
+    document.getElementById('navBar').style.display = 'flex';
+    document.getElementById('searchBtn').style.display = 'none';
+  } else {
+    car.style.transform = 'translate(-50%,-50%) rotate(35deg)';
+  }
+  if (which === 'search') document.getElementById('searchPanel').style.display = 'block';
+  const pin = '<svg viewBox="0 0 24 24"><path d="M21.71,3.71a1,1 0,0 0,-1.08 -0.22l-17,7a1,1 0,0 0,0.1 1.88l7.06,2.1 2.1,7.06a1,1 0,0 0,0.93 0.71h0.03a1,1 0,0 0,0.92 -0.62l7,-17a1,1 0,0 0,-0.06 -0.91z"/></svg>';
+  document.getElementById('places').innerHTML = [
+    ['Vieux-Port de Montréal', '2,1 km · Rue de la Commune E, Montréal, QC'],
+    ['Place Jacques-Cartier', '2,4 km · Montréal, QC'],
+    ['Marché Bonsecours', '2,6 km · 350 Rue Saint-Paul E, Montréal, QC'],
+    ['Vieux-Port, Québec', '251 km · Québec, QC'],
+  ].map(p => `<div class="place"><div class="pi">${pin}</div><div style="min-width:0"><div class="pn">${p[0]}</div><div class="pl">${p[1]}</div></div><div class="chip">Waze</div></div>`).join('');
+
+  // Clavier + contacts (écran Téléphone)
+  document.getElementById('keys').innerHTML = [['1',''],['2','ABC'],['3','DEF'],['4','GHI'],['5','JKL'],['6','MNO'],['7','PQRS'],['8','TUV'],['9','WXYZ'],['*',''],['0','+'],['#','']]
+    .map(k => `<div class="key">${k[0]}${k[1] ? `<small>${k[1]}</small>` : ''}</div>`).join('');
+  const phoneIc = '<svg viewBox="0 0 24 24"><path d="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z"/></svg>';
+  document.getElementById('clist').innerHTML = [['Alex', '514 555-0101'], ['Garage', '450 555-0177'], ['Julie', '514 555-0142'], ['Maman', '418 555-0190'], ['Pizza', '514 555-0123'], ['Sam', '438 555-0168']]
+    .map(c => `<div class="crow2"><div class="av">${c[0][0]}</div><div><div class="cn2">${c[0]}</div><div class="cp">${c[1]}</div></div><div class="go">${phoneIc}</div></div>`).join('');
 
   // Apps fictives (icônes génériques) pour le tiroir et le sélecteur.
   const apps = [
@@ -229,11 +379,10 @@
   document.getElementById('plist').innerHTML = apps.slice(0, 6).map((a, i) =>
     `<div class="pitem${i === 0 ? ' sel' : ''}">${ic(a)}<div><div class="n">${a[0]}</div><div class="p">${a[2]}</div></div></div>`).join('');
 
-  const which = location.hash.slice(1);
   const scr = document.getElementById('s-' + which);
   if (scr) {
-    scr.style.display = 'block';
-    if (which === 'drawer') document.getElementById('home').style.visibility = 'hidden';
+    scr.style.display = scr.classList.contains('call') || scr.classList.contains('phonescr') ? 'flex' : 'block';
+    if (['drawer', 'call', 'incall', 'phone'].includes(which)) document.getElementById('home').style.visibility = 'hidden';
   }
 </script>
 </body>
