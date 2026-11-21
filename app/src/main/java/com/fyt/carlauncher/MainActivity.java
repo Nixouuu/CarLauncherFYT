@@ -21,6 +21,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.osmdroid.config.Configuration;
+import org.osmdroid.config.IConfigurationProvider;
 import org.osmdroid.views.MapView;
 
 import java.io.File;
@@ -123,7 +124,7 @@ public class MainActivity extends Activity {
     }
 
     private void configureOsmdroid() {
-        Configuration cfg = Configuration.getInstance();
+        IConfigurationProvider cfg = Configuration.getInstance();
         cfg.load(getApplicationContext(), PreferenceManager.getDefaultSharedPreferences(getApplicationContext()));
         String version = "dev";
         try {
