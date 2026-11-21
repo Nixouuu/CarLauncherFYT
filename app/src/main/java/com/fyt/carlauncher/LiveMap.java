@@ -78,6 +78,12 @@ final class LiveMap implements LocationListener {
         map.setTilesScaledToDpi(false);
         map.setMultiTouchControls(true);
         map.setBuiltInZoomControls(false);
+        // Pas d'inertie après un glissé : la carte ne continue pas de bouger quand on recentre.
+        map.setFlingEnabled(false);
+        // Voiture placée sous le centre (à ~72 % de la hauteur) pour voir plus loin devant.
+        map.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (b - t != ob - ot) map.setMapCenterOffset(0, Math.round((b - t) * 0.22f));
+        });
         map.setMinZoomLevel(3.0);
         map.setMaxZoomLevel(19.5);
         map.setHorizontalMapRepetitionEnabled(false);
@@ -180,9 +186,11 @@ final class LiveMap implements LocationListener {
         attribution = v;
     }
 
+    /** Revient à la voiture d'un coup : pas d'animation qui se battrait avec le suivi en direct. */
     void recenter() {
+        map.getController().stopAnimation(false);
         setFollowing(true);
-        if (hasPosition) map.getController().animateTo(new GeoPoint(shownLat, shownLon));
+        if (hasPosition) applyFrame(shownLat, shownLon, shownBearing);
     }
 
     private void setFollowing(boolean follow) {
@@ -365,12 +373,14 @@ final class LiveMap implements LocationListener {
         hasPosition = true;
         GeoPoint p = new GeoPoint(lat, lon);
         marker.setPosition(p);
-        marker.setRotation(-bearing);
         if (following) {
+            // Cap en haut : la carte tourne pour que la route devant la voiture soit toujours vers le haut.
+            map.setMapOrientation(-bearing, false);
             map.getController().setCenter(p);
-        } else {
-            map.invalidate();
         }
+        // Flèche à l'écran = cap de la voiture + rotation de la carte (0 = vers le haut quand on suit).
+        marker.setRotation(-(bearing + map.getMapOrientation()));
+        if (!following) map.invalidate();
     }
 
     private void showSpeed(float kmh) {

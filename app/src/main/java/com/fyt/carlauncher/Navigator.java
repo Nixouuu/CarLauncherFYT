@@ -71,6 +71,7 @@ final class Navigator {
         this.tvInstruction = activity.findViewById(R.id.tvNavInstruction);
         this.tvEta = activity.findViewById(R.id.tvNavEta);
         this.audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
+        ensureTts();
     }
 
     boolean isActive() {
@@ -345,13 +346,56 @@ final class Navigator {
 
     // ---------------------------------------------------------------- voix
 
-    private void ensureTts() {
+    private static final String GOOGLE_TTS = "com.google.android.tts";
+    private String voiceStatus = "voix : pas encore initialisée";
+    private String pendingSpeech;
+
+    /** État de la voix (affiché dans Diagnostic et au test). */
+    String voiceStatus() {
+        return voiceStatus;
+    }
+
+    /** Bouton « Tester la voix » des réglages. */
+    void testVoice() {
+        ensureTts();
+        if (ttsReady) {
+            speak(activity.getString(R.string.nav_voice_test), true);
+        } else {
+            pendingSpeech = activity.getString(R.string.nav_voice_test);
+            Toast.makeText(activity, voiceStatus, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Démarre la synthèse vocale tout de suite (pas au premier trajet) : elle est prête quand on en a besoin. */
+    void ensureTts() {
         if (tts != null) return;
-        tts = new TextToSpeech(activity.getApplicationContext(), status -> {
-            if (status != TextToSpeech.SUCCESS || tts == null) return;
-            int r = tts.setLanguage(Locale.CANADA_FRENCH);
-            if (r < 0) r = tts.setLanguage(Locale.FRENCH);
-            ttsReady = r >= 0;
+        // Moteur Google en priorité (meilleure voix française), sinon le moteur par défaut de l'autoradio.
+        boolean google = Apps.isInstalledPackage(activity, GOOGLE_TTS);
+        TextToSpeech.OnInitListener onInit = status -> {
+            if (status != TextToSpeech.SUCCESS || tts == null) {
+                voiceStatus = activity.getString(R.string.nav_voice_no_engine);
+                return;
+            }
+            Locale[] wanted = {Locale.CANADA_FRENCH, Locale.FRENCH, new Locale("fr", "FR"), Locale.getDefault(), Locale.US};
+            int r = TextToSpeech.LANG_NOT_SUPPORTED;
+            Locale used = null;
+            for (Locale l : wanted) {
+                r = tts.setLanguage(l);
+                if (r >= TextToSpeech.LANG_AVAILABLE) {
+                    used = l;
+                    break;
+                }
+            }
+            ttsReady = used != null;
+            voiceStatus = !ttsReady ? activity.getString(R.string.nav_voice_no_language)
+                    : "fr".equals(used.getLanguage())
+                    ? activity.getString(R.string.nav_voice_ok, tts.getDefaultEngine())
+                    : activity.getString(R.string.nav_voice_not_french, used.getDisplayName(Locale.FRENCH));
+            if (ttsReady && pendingSpeech != null) {
+                String s = pendingSpeech;
+                pendingSpeech = null;
+                activity.runOnUiThread(() -> speak(s, true));
+            }
             tts.setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
@@ -360,13 +404,28 @@ final class Navigator {
                 @Override public void onDone(String id) { abandonFocus(); }
                 @Override public void onError(String id) { abandonFocus(); }
             });
-        });
+        };
+        Context app = activity.getApplicationContext();
+        tts = google ? new TextToSpeech(app, onInit, GOOGLE_TTS) : new TextToSpeech(app, onInit);
     }
 
     private AudioFocusRequest focusRequest;
 
+    static final String KEY_VOICE = "nav_voice";
+
     private void speak(String text) {
-        if (!ttsReady || tts == null || text == null || text.isEmpty()) return;
+        speak(text, false);
+    }
+
+    private void speak(String text, boolean force) {
+        if (text == null || text.isEmpty()) return;
+        if (!force && !activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_VOICE, false)) return;   // voix désactivée par défaut (Réglages › Voix de navigation)
+        if (!ttsReady || tts == null) {
+            pendingSpeech = text;   // dite dès que la voix est prête
+            ensureTts();
+            return;
+        }
         // Baisse la musique le temps de la consigne.
         if (Build.VERSION.SDK_INT >= 26) {
             focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)

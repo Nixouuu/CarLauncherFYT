@@ -34,8 +34,8 @@
     <string name="settings_sound_section">Son des touches</string>
     <string name="settings_sound_enabled">Son au toucher</string>
     <string name="settings_sound_volume">Volume du son</string>
-    <string name="settings_sound_adaptive">Adapter au volume de la musique</string>
-    <string name="settings_sound_adaptive_hint">Plus discret quand la musique est forte, plus audible quand elle est basse</string>
+    <string name="settings_sound_adaptive">Volume constant</string>
+    <string name="settings_sound_adaptive_hint">Même niveau que la musique soit forte ou basse ; aucun son quand le volume est à 0</string>
     <string name="settings_sound_test">Tester</string>
     <string name="settings_music_app">Application musique</string>
     <string name="settings_home_app">Changer d\'application d\'accueil</string>
@@ -90,5 +90,12 @@
     <string name="nav_in_distance">Dans %1$s, %2$s</string>
     <string name="nav_eta">Arrivée %1$s · %2$s · %3$s</string>
     <string name="nav_stop">Arrêter</string>
+    <string name="nav_voice_test">Test de la voix. Dans 300 mètres, tournez à droite.</string>
+    <string name="nav_voice_no_engine">Aucun moteur de voix sur l’autoradio. Installez « Services de reconnaissance et de synthèse vocales de Google » depuis le Play Store.</string>
+    <string name="nav_voice_no_language">Le moteur de voix n’a aucune langue installée. Ouvrez Paramètres Android › Synthèse vocale et téléchargez le français.</string>
+    <string name="nav_voice_ok">Voix française prête (%1$s).</string>
+    <string name="nav_voice_not_french">Voix française absente, voix %1$s utilisée. Téléchargez le français dans Paramètres Android › Synthèse vocale.</string>
+    <string name="settings_nav_voice">Voix de navigation</string>
+    <string name="settings_voice_test">Tester la voix de navigation</string>
     <string name="map_attribution_stadia">© Stadia Maps © OpenMapTiles © OpenStreetMap</string>
 </resources>

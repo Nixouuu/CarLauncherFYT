@@ -21,7 +21,7 @@ final class ClickSound {
     static final String KEY_ENABLED = "sound_enabled";
     static final String KEY_VOLUME = "sound_volume";      // 0..100
     static final String KEY_ADAPTIVE = "sound_adaptive";
-    static final int DEFAULT_VOLUME = 45;
+    static final int DEFAULT_VOLUME = 60;
 
     private static final int SAMPLE_RATE = 44100;
     private static ClickSound instance;
@@ -44,7 +44,10 @@ final class ClickSound {
             short[] pcm = synthesize();
             track = new AudioTrack(
                     new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            // Flux « système », indépendant du volume de la musique : le son garde le même
+                            // niveau que la musique soit à 1 ou à 100 (le volume musique sert seulement à
+                            // couper le son quand il est à 0).
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build(),
                     new AudioFormat.Builder()
@@ -86,27 +89,21 @@ final class ClickSound {
     }
 
     /**
-     * Comme sur un téléphone : volume à 0 (ou sourdine) → aucun son. Sinon le son passe par le même
-     * amplificateur que la musique, donc il suit déjà le volume ; ce facteur le remonte quand le volume
-     * est bas (audible même à 1) et le baisse quand il est haut (jamais agressif).
-     * Volume de référence : celui de l'autoradio FYT s'il est connu, sinon celui du flux musique Android.
+     * Comme sur un téléphone : volume à 0 (ou sourdine) → aucun son ; sinon toujours le même niveau.
+     *  - Volume Android : le son joue sur le flux système, donc le volume musique ne le change pas → 1.
+     *  - Autoradio FYT : son volume (le « 25 » de la barre) agit sur l'amplificateur, après Android, donc
+     *    il amplifie aussi le son des touches. On compense : son remonté quand le volume est bas,
+     *    baissé quand il est haut, pour garder à peu près le même niveau perçu.
      * Retourne 0 quand il ne faut rien jouer.
      */
     private float adaptiveFactor() {
-        float ratio = -1f;
+        if (audioManager != null && audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) return 0f;
         FytBt bt = FytBt.get(appContext);
-        if (bt.volume >= 0) {
-            if (bt.muted || bt.volume == 0) return 0f;
-            ratio = bt.volume / (float) Math.max(1, bt.volumeMax);
-        } else if (audioManager != null) {
-            int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            if (cur == 0) return 0f;
-            if (max > 0) ratio = cur / (float) max;
-        }
-        if (ratio < 0) return 1f;
-        // 1/40 → 1.0 ; 25 % → ~0.42 ; 100 % → 0.22
-        return Math.max(0.22f, Math.min(1f, 0.22f / (float) Math.sqrt(Math.max(0.01f, ratio)) * 0.95f));
+        if (bt.volume < 0) return 1f;
+        if (bt.muted || bt.volume == 0) return 0f;
+        float ratio = bt.volume / (float) Math.max(1, bt.volumeMax);
+        // 1/40 → 1.0 ; 25 % → ~0.35 ; 100 % → 0.12
+        return Math.max(0.12f, Math.min(1f, 0.12f / ratio * 0.95f + 0.05f));
     }
 
     /**

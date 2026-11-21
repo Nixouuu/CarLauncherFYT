@@ -252,6 +252,7 @@ public class MainActivity extends Activity {
             @Override public void openHomeChooser() { MainActivity.this.openHomeChooser(); }
             @Override public void openAndroidSettings() { MainActivity.this.openAndroidSettings(); }
             @Override public void showDiagnostics() { MainActivity.this.showDiagnostics(); }
+            @Override public void testVoice() { navigator.testVoice(); }
         });
     }
 
@@ -398,7 +399,7 @@ public class MainActivity extends Activity {
     /** Journal des échanges avec le Bluetooth FYT (pour déboguer appels et contacts sur l'autoradio). */
     private void showDiagnostics() {
         TextView text = new TextView(this);
-        text.setText(fyt.dump());
+        text.setText(navigator.voiceStatus() + "\n" + fyt.dump());
         text.setTextColor(0xFFFFFFFF);
         text.setTextSize(12);
         text.setTypeface(android.graphics.Typeface.MONOSPACE);

@@ -15,6 +15,7 @@ final class SettingsDialog {
         void openHomeChooser();
         void openAndroidSettings();
         void showDiagnostics();
+        void testVoice();
     }
 
     private SettingsDialog() {}
@@ -69,6 +70,16 @@ final class SettingsDialog {
             sound.play();
             dialog.dismiss();
             actions.openHomeChooser();
+        });
+        final Switch swNavVoice = root.findViewById(R.id.swNavVoice);
+        swNavVoice.setChecked(prefs.getBoolean(Navigator.KEY_VOICE, false));
+        swNavVoice.setOnCheckedChangeListener((b, checked) -> {
+            prefs.edit().putBoolean(Navigator.KEY_VOICE, checked).apply();
+            sound.play();
+        });
+        root.findViewById(R.id.btnVoiceTest).setOnClickListener(v -> {
+            sound.play();
+            actions.testVoice();
         });
         root.findViewById(R.id.btnDiagnostics).setOnClickListener(v -> {
             sound.play();

@@ -100,6 +100,16 @@ final class Apps {
         return pkg != null && context.getPackageManager().getLaunchIntentForPackage(pkg) != null;
     }
 
+    /** Paquet installé, même sans icône de lancement (ex. moteur de synthèse vocale). */
+    static boolean isInstalledPackage(Context context, String pkg) {
+        try {
+            context.getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     static String labelOf(Context context, String pkg) {
         try {
             PackageManager pm = context.getPackageManager();

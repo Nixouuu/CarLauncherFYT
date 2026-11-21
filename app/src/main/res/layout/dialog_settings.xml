@@ -99,6 +99,21 @@
             style="@style/SettingsRow"
             android:text="@string/settings_android" />
 
+        <Switch
+            android:id="@+id/swNavVoice"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="6dp"
+            android:soundEffectsEnabled="false"
+            android:text="@string/settings_nav_voice"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp" />
+
+        <TextView
+            android:id="@+id/btnVoiceTest"
+            style="@style/SettingsRow"
+            android:text="@string/settings_voice_test" />
+
         <TextView
             android:id="@+id/btnDiagnostics"
             style="@style/SettingsRow"
