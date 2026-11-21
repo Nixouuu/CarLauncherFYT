@@ -76,15 +76,16 @@ final class LiveMap implements LocationListener {
 
     void setup() {
         map.setTilesScaledToDpi(false);
-        map.setTilesScaleFactor(MapTiles.SCALE);
         map.setMultiTouchControls(true);
         map.setBuiltInZoomControls(false);
         map.setMinZoomLevel(3.0);
         map.setMaxZoomLevel(19.5);
         map.setHorizontalMapRepetitionEnabled(false);
         map.setVerticalMapRepetitionEnabled(false);
-        map.setTileSource(MapTiles.SOURCE);
-        map.getOverlayManager().getTilesOverlay().setColorFilter(MapTiles.darkFilter());
+        applyTiles(StadiaApi.hasKey());
+        if (StadiaApi.hasKey()) {
+            StadiaApi.checkTiles((ok, err) -> { if (!Boolean.TRUE.equals(ok)) applyTiles(false); });
+        }
         map.getOverlayManager().getTilesOverlay().setLoadingBackgroundColor(0xFF1C1C1E);
         map.getOverlayManager().getTilesOverlay().setLoadingLineColor(0xFF1C1C1E);
         map.getController().setZoom(DEFAULT_ZOOM);
@@ -122,6 +123,61 @@ final class LiveMap implements LocationListener {
                 return false;
             }
         });
+    }
+
+    interface LocationObserver {
+        void onLocation(Location loc);
+    }
+
+    private LocationObserver observer;
+    private Location lastAccepted;
+
+    void setLocationObserver(LocationObserver o) {
+        observer = o;
+    }
+
+    /** Dernière position reçue (GPS de préférence), ou dernière connue du système. */
+    Location lastLocation() {
+        if (lastAccepted != null) return lastAccepted;
+        if (locationManager == null || !hasPermission()) return null;
+        try {
+            Location l = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            return l != null ? l : locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        } catch (SecurityException e) {
+            return null;
+        }
+    }
+
+    /** Mode navigation : zoom rapproché et suivi de la voiture. */
+    void setNavigationMode(boolean on) {
+        map.getController().setZoom(on ? 17.5 : DEFAULT_ZOOM);
+        recenter();
+    }
+
+    MapView map() {
+        return map;
+    }
+
+    /** Fond de carte : Stadia (sombre) si la clé est valide, sinon OpenStreetMap assombri. */
+    private void applyTiles(boolean stadia) {
+        if (stadia) {
+            map.setTilesScaleFactor(MapTiles.STADIA_SCALE);
+            map.setTileSource(MapTiles.stadiaDark());
+            map.getOverlayManager().getTilesOverlay().setColorFilter(null);
+        } else {
+            map.setTilesScaleFactor(MapTiles.SCALE);
+            map.setTileSource(MapTiles.SOURCE);
+            map.getOverlayManager().getTilesOverlay().setColorFilter(MapTiles.darkFilter());
+        }
+        if (attribution != null) {
+            attribution.setText(stadia ? R.string.map_attribution_stadia : R.string.map_attribution);
+        }
+    }
+
+    private TextView attribution;
+
+    void setAttributionView(TextView v) {
+        attribution = v;
     }
 
     void recenter() {
@@ -202,6 +258,8 @@ final class LiveMap implements LocationListener {
         } else if (now - lastGpsFixAt < 10000) {
             return;   // GPS actif : on ignore le réseau, moins précis
         }
+        lastAccepted = loc;
+        if (observer != null) observer.onLocation(loc);
 
         if (!hasPosition || lastFix == null) {
             jumpTo(loc);

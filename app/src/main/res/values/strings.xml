@@ -24,11 +24,11 @@
     <string name="update_available">MÀJ</string>
     <string name="update_downloading">Téléchargement de la mise à jour…</string>
     <string name="update_failed">Échec du téléchargement de la mise à jour.</string>
-    <string name="update_allow_install">Autorisez l\'installation d\'applications pour CarLauncher, puis réessayez.</string>
+    <string name="update_allow_install">Autorisez l\\'installation d\\'applications pour CarLauncher, puis réessayez.</string>
     <string name="map_attribution">© les contributeurs d’OpenStreetMap</string>
     <string name="recenter">Recentrer</string>
     <string name="music_starting">Démarrage de %1$s…</string>
-    <string name="music_no_app">Appui long sur la carte musique pour choisir l\'application.</string>
+    <string name="music_no_app">Appui long sur la carte musique pour choisir l\\'application.</string>
 
     <!-- Réglages du launcher -->
     <string name="settings_sound_section">Son des touches</string>
@@ -38,7 +38,57 @@
     <string name="settings_sound_adaptive_hint">Plus discret quand la musique est forte, plus audible quand elle est basse</string>
     <string name="settings_sound_test">Tester</string>
     <string name="settings_music_app">Application musique</string>
-    <string name="settings_home_app">Changer d\'application d\'accueil</string>
+    <string name="settings_home_app">Changer d\\'application d\\'accueil</string>
     <string name="settings_android">Paramètres Android</string>
     <string name="settings_close">Fermer</string>
+
+    <!-- Musique Bluetooth -->
+    <string name="music_bt">Musique Bluetooth</string>
+    <string name="music_bt_source">Bluetooth · %1$s</string>
+
+    <!-- Téléphone -->
+    <string name="phone_connected">Connecté</string>
+    <string name="phone_not_connected_short">Aucun téléphone connecté</string>
+    <string name="phone_keypad_contacts">Clavier et contacts</string>
+    <string name="phone_enter_number">Numéro</string>
+    <string name="phone_search_contacts">Rechercher un contact</string>
+    <string name="phone_sync">Synchroniser les contacts</string>
+    <string name="phone_syncing">Synchronisation des contacts de l\'iPhone…</string>
+    <string name="phone_no_contacts">Aucun contact pour l\'instant.\nTouchez ⟳ pour récupérer le répertoire du téléphone (l\'iPhone peut demander d\'autoriser l\'accès).</string>
+    <string name="phone_bt_unavailable">Bluetooth de l\'autoradio non disponible. Voir Réglages → Diagnostic Bluetooth.</string>
+    <string name="phone_not_connected">Aucun téléphone connecté en Bluetooth</string>
+    <string name="phone_status_connected">Connecté à %1$s</string>
+    <string name="phone_status_service">Bluetooth : %1$s</string>
+    <string name="phone_redial">Rappel du dernier numéro…</string>
+    <string name="call_incoming">Appel entrant…</string>
+    <string name="call_dialing">Appel en cours…</string>
+    <string name="call_unknown">Numéro inconnu</string>
+    <string name="call_answer">Répondre</string>
+    <string name="call_reject">Refuser</string>
+    <string name="call_hang_up">Raccrocher</string>
+    <string name="call_keypad">Clavier</string>
+    <string name="call_audio_phone">Sur le téléphone</string>
+    <string name="call_audio_car">Sur la voiture</string>
+    <string name="settings_diagnostics">Diagnostic Bluetooth</string>
+
+    <!-- Navigation -->
+    <string name="nav_where_to">Où aller ?</string>
+    <string name="nav_search_hint">Adresse, commerce, lieu…</string>
+    <string name="nav_recent">Récents</string>
+    <string name="nav_results">Résultats</string>
+    <string name="nav_searching">Recherche…</string>
+    <string name="nav_no_result">Aucun résultat</string>
+    <string name="nav_search_error">Recherche impossible (pas d\'Internet ?)</string>
+    <string name="nav_type_address">Tapez une adresse ou un nom de lieu</string>
+    <string name="nav_no_key">Recherche indisponible : clé Stadia manquante dans le build.</string>
+    <string name="nav_no_gps">Position GPS inconnue pour l\'instant. Réessayez dans quelques secondes.</string>
+    <string name="nav_computing">Calcul de l\'itinéraire…</string>
+    <string name="nav_route_error">Itinéraire impossible à calculer</string>
+    <string name="nav_start_spoken">C\'est parti pour %1$s.</string>
+    <string name="nav_rerouted">Nouvel itinéraire.</string>
+    <string name="nav_arrived">Vous êtes arrivé.</string>
+    <string name="nav_in_distance">Dans %1$s, %2$s</string>
+    <string name="nav_eta">Arrivée %1$s · %2$s · %3$s</string>
+    <string name="nav_stop">Arrêter</string>
+    <string name="map_attribution_stadia">© Stadia Maps © OpenMapTiles © OpenStreetMap</string>
 </resources>

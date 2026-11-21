@@ -14,6 +14,7 @@ final class SettingsDialog {
         void pickMusicApp();
         void openHomeChooser();
         void openAndroidSettings();
+        void showDiagnostics();
     }
 
     private SettingsDialog() {}
@@ -68,6 +69,11 @@ final class SettingsDialog {
             sound.play();
             dialog.dismiss();
             actions.openHomeChooser();
+        });
+        root.findViewById(R.id.btnDiagnostics).setOnClickListener(v -> {
+            sound.play();
+            dialog.dismiss();
+            actions.showDiagnostics();
         });
         root.findViewById(R.id.btnAndroidSettings).setOnClickListener(v -> {
             sound.play();

@@ -5,17 +5,26 @@ import android.graphics.ColorMatrixColorFilter;
 
 import org.osmdroid.tileprovider.tilesource.ITileSource;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.tileprovider.tilesource.XYTileSource;
 
 /**
- * Fond de carte : OpenStreetMap standard (données les plus complètes et à jour, sans clé API),
- * rendu toujours sombre par un filtre de couleurs appliqué aux tuiles.
- *
- * Filtre = invert(1) → hue-rotate(180°) → brightness(0.95) → contrast(0.9) → saturate(0.55)
- * (mêmes valeurs que la maquette docs/preview/home.html) : fond gris foncé, routes claires,
- * l'eau et les parcs gardent des teintes naturelles.
+ * Fonds de carte, toujours sombres :
+ *  - Stadia « Alidade Smooth Dark » (style proche d'Apple Plans la nuit) quand la clé Stadia est présente ;
+ *  - sinon OpenStreetMap standard assombri par un filtre de couleurs (aucune clé nécessaire).
  */
 final class MapTiles {
 
+    // ---- Stadia
+    /** Tuiles @2x (512 px) affichées à 384 px : nettes, noms de rue lisibles. */
+    static final float STADIA_SCALE = 0.75f;
+
+    static XYTileSource stadiaDark() {
+        return new XYTileSource("StadiaSmoothDark2x", 0, 20, 512, "@2x.png?api_key=" + StadiaApi.KEY,
+                new String[]{"https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/"},
+                "© Stadia Maps © OpenMapTiles © OpenStreetMap");
+    }
+
+    // ---- OpenStreetMap assombri (secours)
     static final ITileSource SOURCE = TileSourceFactory.MAPNIK;
 
     /** Tuiles 256 px affichées un peu plus grandes pour des noms de rue lisibles en conduisant. */
@@ -23,6 +32,7 @@ final class MapTiles {
 
     private MapTiles() {}
 
+    /** invert(1) → hue-rotate(180°) → brightness(0.95) → contrast(0.9) → saturate(0.55). */
     static ColorMatrixColorFilter darkFilter() {
         ColorMatrix m = new ColorMatrix(new float[]{
                 -1, 0, 0, 0, 255,

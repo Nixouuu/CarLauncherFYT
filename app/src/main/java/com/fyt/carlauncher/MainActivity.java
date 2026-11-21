@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
     private static final String SLOT_STOCK_HOME = "slot_stock_home";
     private static final String DEFAULT_WAZE_PKG = "com.waze";
 
-    private TextView tvClock, tvDay, tvDate, tvPhoneSub, tvOpenNavLabel, tvNavInstruction;
+    private TextView tvClock, tvDay, tvDate, tvPhoneSub, tvNavInstruction;
     private View navBanner, btnOtaUpdate;
     private String pendingUpdateUrl;
 
@@ -51,6 +51,9 @@ public class MainActivity extends Activity {
     private ClickSound sound;
     private LiveMap liveMap;
     private MediaHub mediaHub;
+    private Navigator navigator;
+    private PlaceSearch placeSearch;
+    private FytBt fyt;
 
     private final SimpleDateFormat clockFormat = new SimpleDateFormat("HH:mm", Locale.FRENCH);
     private final SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE", Locale.FRENCH);
@@ -67,6 +70,7 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver navReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            if (navigator != null && navigator.isActive()) return;   // notre guidage a la priorité
             String text = intent.getStringExtra(CarNotificationListenerService.EXTRA_NAV_TEXT);
             if (!TextUtils.isEmpty(text)) {
                 tvNavInstruction.setText(text);
@@ -98,14 +102,24 @@ public class MainActivity extends Activity {
         tvDay = findViewById(R.id.tvDay);
         tvDate = findViewById(R.id.tvDate);
         tvPhoneSub = findViewById(R.id.tvPhoneSub);
-        tvOpenNavLabel = findViewById(R.id.tvOpenNavLabel);
         tvNavInstruction = findViewById(R.id.tvNavInstruction);
         navBanner = findViewById(R.id.navBanner);
         btnOtaUpdate = findViewById(R.id.btnOtaUpdate);
 
         liveMap = new LiveMap(this, (MapView) findViewById(R.id.mapView),
                 (TextView) findViewById(R.id.tvSpeed), findViewById(R.id.btnRecenter));
+        liveMap.setAttributionView((TextView) findViewById(R.id.tvMapAttribution));
         liveMap.setup();
+        navigator = new Navigator(this, liveMap.map(), liveMap);
+        liveMap.setLocationObserver(navigator::onLocation);
+        placeSearch = new PlaceSearch(this, prefs, sound, liveMap, navigator);
+
+        fyt = FytBt.get(this);
+        fyt.connect();
+        CallActivity.watchCalls(this);
+        fyt.addListener(code -> {
+            if (code == FytBt.U_PHONE_NAME || code == FytBt.U_PHONE_STATE || code == -1) refreshShortcutLabels();
+        });
         mediaHub = new MediaHub(this, prefs,
                 new ComponentName(this, CarNotificationListenerService.class));
 
@@ -177,12 +191,12 @@ public class MainActivity extends Activity {
         onLongTap(R.id.cardMusicPanel, () -> openAppPicker(MediaHub.SLOT_MUSIC, music));
 
         // Dock
-        onTap(R.id.dockNav, () -> launchSlot(SLOT_NAV, nav));
-        onLongTap(R.id.dockNav, () -> openAppPicker(SLOT_NAV, nav));
+        onTap(R.id.dockNav, placeSearch::open);                         // navigation intégrée
+        onLongTap(R.id.dockNav, () -> launchSlot(SLOT_NAV, nav));        // appui long : Waze
         onTap(R.id.dockMusic, this::openMusicApp);
         onLongTap(R.id.dockMusic, () -> openAppPicker(MediaHub.SLOT_MUSIC, music));
-        onTap(R.id.dockPhone, () -> launchSlot(SLOT_PHONE, phone));
-        onLongTap(R.id.dockPhone, () -> openAppPicker(SLOT_PHONE, phone));
+        onTap(R.id.dockPhone, this::openPhone);
+        onLongTap(R.id.dockPhone, () -> launchSlot(SLOT_PHONE, phone));
         onTap(R.id.dockApps, () -> {
             startActivity(new Intent(this, AppDrawerActivity.class));
             overridePendingTransition(0, 0);
@@ -200,12 +214,13 @@ public class MainActivity extends Activity {
 
         // Carte
         onTap(R.id.btnRecenter, liveMap::recenter);
-        onTap(R.id.btnOpenWaze, () -> launchSlot(SLOT_NAV, nav));
-        onLongTap(R.id.btnOpenWaze, () -> openAppPicker(SLOT_NAV, nav));
+        onTap(R.id.btnSearchPlace, placeSearch::open);
+        onTap(R.id.btnNavWaze, navigator::openInWaze);
+        onTap(R.id.btnNavStop, navigator::stop);
 
         // Téléphone
-        onTap(R.id.cardPhone, () -> launchSlot(SLOT_PHONE, phone));
-        onLongTap(R.id.cardPhone, () -> openAppPicker(SLOT_PHONE, phone));
+        onTap(R.id.cardPhone, this::openPhone);
+        onLongTap(R.id.cardPhone, () -> launchSlot(SLOT_PHONE, phone));
 
         // Mise à jour
         onTap(R.id.btnOtaUpdate, () -> {
@@ -215,8 +230,17 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void openPhone() {
+        startActivity(new Intent(this, PhoneActivity.class));
+        overridePendingTransition(0, 0);
+    }
+
     private void openMusicApp() {
         String pkg = mediaHub.musicPackage();
+        if (pkg == null && fyt.isPhoneConnected()) {
+            mediaHub.togglePlayPause();   // musique Bluetooth : on reste dans le launcher
+            return;
+        }
         if (pkg == null || !Apps.launch(this, pkg)) {
             openAppPicker(MediaHub.SLOT_MUSIC, getString(R.string.music_title));
         }
@@ -227,6 +251,7 @@ public class MainActivity extends Activity {
             @Override public void pickMusicApp() { openAppPicker(MediaHub.SLOT_MUSIC, getString(R.string.music_title)); }
             @Override public void openHomeChooser() { MainActivity.this.openHomeChooser(); }
             @Override public void openAndroidSettings() { MainActivity.this.openAndroidSettings(); }
+            @Override public void showDiagnostics() { MainActivity.this.showDiagnostics(); }
         });
     }
 
@@ -268,12 +293,14 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         try { unregisterReceiver(packageReceiver); } catch (IllegalArgumentException ignored) {}
+        if (navigator != null) navigator.release();
         executor.shutdownNow();
     }
 
     @Override
     public void onBackPressed() {
-        // Launcher : le bouton retour ne quitte pas l'accueil.
+        // Launcher : le bouton retour ne quitte pas l'accueil ; il ferme seulement la recherche.
+        if (placeSearch != null && placeSearch.isOpen()) placeSearch.close();
     }
 
     // ---------------------------------------------------------------- permissions / OTA
@@ -359,10 +386,33 @@ public class MainActivity extends Activity {
     }
 
     private void refreshShortcutLabels() {
-        String phoneName = prefs.getString(SLOT_PHONE + KEY_NAME_SUFFIX, null);
-        tvPhoneSub.setText(!TextUtils.isEmpty(phoneName) ? phoneName : getString(R.string.tap_to_assign));
-        String navName = prefs.getString(SLOT_NAV + KEY_NAME_SUFFIX, null);
-        tvOpenNavLabel.setText(!TextUtils.isEmpty(navName) ? navName : getString(R.string.open_waze));
+        if (fyt != null && fyt.isPhoneConnected()) {
+            tvPhoneSub.setText(fyt.phoneName != null ? fyt.phoneName : getString(R.string.phone_connected));
+        } else if (fyt != null && fyt.isReady()) {
+            tvPhoneSub.setText(R.string.phone_not_connected_short);
+        } else {
+            tvPhoneSub.setText(R.string.phone_keypad_contacts);
+        }
+    }
+
+    /** Journal des échanges avec le Bluetooth FYT (pour déboguer appels et contacts sur l'autoradio). */
+    private void showDiagnostics() {
+        TextView text = new TextView(this);
+        text.setText(fyt.dump());
+        text.setTextColor(0xFFFFFFFF);
+        text.setTextSize(12);
+        text.setTypeface(android.graphics.Typeface.MONOSPACE);
+        text.setTextIsSelectable(true);
+        int pad = Keypad.dp(this, 16);
+        text.setPadding(pad, pad, pad, pad);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(text);
+        new AlertDialog.Builder(this, R.style.CarDialogTheme)
+                .setTitle(R.string.settings_diagnostics)
+                .setView(scroll)
+                .setPositiveButton(R.string.settings_close, null)
+                .setNeutralButton(R.string.phone_sync, (d, w) -> fyt.downloadContacts())
+                .show();
     }
 
     private void openHomeChooser() {

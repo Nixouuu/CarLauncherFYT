@@ -62,6 +62,7 @@ final class MediaHub {
     private final View btnAccess;
 
     private MediaController controller;
+    private final FytBt fyt;
     private boolean started;
     private Boolean shownPlaying;
     /** Après un appui, on garde l'état affiché le temps que l'app réagisse (évite le clignotement). */
@@ -73,6 +74,7 @@ final class MediaHub {
         this.listenerComponent = listenerComponent;
         this.audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
         this.sessionManager = (MediaSessionManager) activity.getSystemService(Context.MEDIA_SESSION_SERVICE);
+        this.fyt = FytBt.get(activity);
         tvSource = activity.findViewById(R.id.tvMusicSource);
         tvTitle = activity.findViewById(R.id.tvTrackTitle);
         tvArtist = activity.findViewById(R.id.tvTrackArtist);
@@ -98,6 +100,7 @@ final class MediaHub {
 
     void start() {
         started = true;
+        fyt.addListener(fytListener);
         if (!hasNotificationAccess()) {
             btnAccess.setVisibility(View.VISIBLE);
             bind(null);
@@ -116,6 +119,7 @@ final class MediaHub {
 
     void stop() {
         started = false;
+        fyt.removeListener(fytListener);
         handler.removeCallbacksAndMessages(null);
         try {
             sessionManager.removeOnActiveSessionsChangedListener(sessionsListener);
@@ -202,15 +206,54 @@ final class MediaHub {
             renderMetadata(controller.getMetadata());
             renderPlaying(isPlaying(controller.getPlaybackState()));
         } else {
-            String pkg = musicPackage();
-            tvSource.setText(pkg != null ? Apps.labelOf(activity, pkg) : activity.getString(R.string.music_title));
-            tvTitle.setText(R.string.media_idle_title);
-            tvArtist.setText(R.string.media_idle_artist);
-            showPlaceholderArt();
-            renderPlaying(audioManager != null && audioManager.isMusicActive());
+            renderIdle();
         }
         renderProgress();
     }
+
+    // ---------------------------------------------------------------- musique Bluetooth FYT (iPhone)
+
+    /** Vrai quand la musique passe par le Bluetooth FYT (pas de session Android, ex. iPhone en A2DP). */
+    private boolean useFytBt() {
+        return controller == null && fyt.isReady() && fyt.isPhoneConnected()
+                && (fyt.btavTitle != null || fyt.btavPlaying || musicPackage() == null);
+    }
+
+    private boolean isIdlePlaying() {
+        if (fyt.isReady() && fyt.btavPlaying) return true;
+        return audioManager != null && audioManager.isMusicActive();
+    }
+
+    /** Aucune session Android : titre de la musique Bluetooth FYT si connu, sinon écran d'attente. */
+    private void renderIdle() {
+        if (useFytBt() && !TextUtils.isEmpty(fyt.btavTitle)) {
+            tvSource.setText(fyt.phoneName != null
+                    ? activity.getString(R.string.music_bt_source, fyt.phoneName)
+                    : activity.getString(R.string.music_bt));
+            tvTitle.setText(fyt.btavTitle);
+            tvArtist.setText(fyt.btavArtist != null ? fyt.btavArtist : "");
+        } else {
+            String pkg = musicPackage();
+            tvSource.setText(pkg != null ? Apps.labelOf(activity, pkg)
+                    : (fyt.isPhoneConnected() ? activity.getString(R.string.music_bt) : activity.getString(R.string.music_title)));
+            tvTitle.setText(R.string.media_idle_title);
+            tvArtist.setText(R.string.media_idle_artist);
+        }
+        showPlaceholderArt();
+        if (SystemClock.elapsedRealtime() > holdStateUntil) renderPlaying(isIdlePlaying());
+    }
+
+    private final FytBt.Listener fytListener = code -> {
+        if (!started || controller != null) return;
+        if (code == FytBt.U_BTAV_TITLE || code == FytBt.U_BTAV_ARTIST || code == FytBt.U_PHONE_STATE
+                || code == FytBt.U_PHONE_NAME || code == -1) {
+            renderIdle();
+        } else if (code == FytBt.U_BTAV_PLAY_STATE) {
+            holdStateUntil = 0;
+            renderPlaying(isIdlePlaying());
+        }
+        if (code == FytBt.U_BTAV_PLAY_TIME || code == FytBt.U_BTAV_TOTAL_TIME) renderProgress();
+    };
 
     private static boolean isPlaying(PlaybackState state) {
         if (state == null) return false;
@@ -253,7 +296,12 @@ final class MediaHub {
 
     private void renderProgress() {
         if (controller == null) {
-            progress.setVisibility(View.INVISIBLE);
+            if (useFytBt() && fyt.btavDurationMs > 0 && fyt.btavPositionMs >= 0) {
+                progress.setVisibility(View.VISIBLE);
+                progress.setProgress((int) (1000L * Math.min(fyt.btavPositionMs, fyt.btavDurationMs) / fyt.btavDurationMs));
+            } else {
+                progress.setVisibility(View.INVISIBLE);
+            }
             return;
         }
         MediaMetadata md = controller.getMetadata();
@@ -276,8 +324,8 @@ final class MediaHub {
         @Override
         public void run() {
             if (!started) return;
-            if (controller == null && SystemClock.elapsedRealtime() > holdStateUntil) {
-                renderPlaying(audioManager != null && audioManager.isMusicActive());
+            if (controller == null) {
+                if (SystemClock.elapsedRealtime() > holdStateUntil) renderPlaying(isIdlePlaying());
             } else if (!isPlaying(controller.getPlaybackState())) {
                 refreshSessions();   // une autre app a peut-être pris le relais
             }
@@ -301,6 +349,16 @@ final class MediaHub {
             }
             return;
         }
+        if (useFytBt()) {
+            if (fyt.btavPlaying) {
+                fyt.btavPause();
+                renderPlaying(false);
+            } else {
+                fyt.startBluetoothMusic();   // source BT + lecture : relance Apple Music sur l'iPhone
+                renderPlaying(true);
+            }
+            return;
+        }
         if (audioManager != null && audioManager.isMusicActive()) {
             dispatchKey(KeyEvent.KEYCODE_MEDIA_PAUSE);
             renderPlaying(false);
@@ -311,11 +369,13 @@ final class MediaHub {
 
     void previous() {
         if (controller != null) controller.getTransportControls().skipToPrevious();
+        else if (useFytBt()) fyt.btavPrev();
         else dispatchKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
     }
 
     void next() {
         if (controller != null) controller.getTransportControls().skipToNext();
+        else if (useFytBt()) fyt.btavNext();
         else dispatchKey(KeyEvent.KEYCODE_MEDIA_NEXT);
     }
 

@@ -26,6 +26,7 @@ final class ClickSound {
     private static final int SAMPLE_RATE = 44100;
     private static ClickSound instance;
 
+    private final Context appContext;
     private final AudioManager audioManager;
     private final SharedPreferences prefs;
     private AudioTrack track;
@@ -36,6 +37,7 @@ final class ClickSound {
     }
 
     private ClickSound(Context app) {
+        appContext = app;
         audioManager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         prefs = app.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
         try {
@@ -70,7 +72,9 @@ final class ClickSound {
         if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) return;
         float user = Math.max(0, Math.min(100, volumePercent)) / 100f;
         float gain = user * user;                     // courbe perceptuelle
-        if (adaptive) gain *= adaptiveFactor();
+        float factor = adaptiveFactor();
+        if (factor <= 0f) return;                     // volume à 0 ou sourdine : silence, comme un téléphone
+        if (adaptive) gain *= factor;
         if (gain <= 0.001f) return;
         try {
             if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) track.stop();
@@ -81,14 +85,28 @@ final class ClickSound {
         }
     }
 
-    /** 0.2 quand la musique est au max, 1.0 quand elle est à 20 % ou moins. */
+    /**
+     * Comme sur un téléphone : volume à 0 (ou sourdine) → aucun son. Sinon le son passe par le même
+     * amplificateur que la musique, donc il suit déjà le volume ; ce facteur le remonte quand le volume
+     * est bas (audible même à 1) et le baisse quand il est haut (jamais agressif).
+     * Volume de référence : celui de l'autoradio FYT s'il est connu, sinon celui du flux musique Android.
+     * Retourne 0 quand il ne faut rien jouer.
+     */
     private float adaptiveFactor() {
-        if (audioManager == null) return 1f;
-        int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        int cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        if (max <= 0) return 1f;
-        float ratio = Math.max(0.01f, cur / (float) max);
-        return Math.max(0.2f, Math.min(1f, 0.2f / ratio));
+        float ratio = -1f;
+        FytBt bt = FytBt.get(appContext);
+        if (bt.volume >= 0) {
+            if (bt.muted || bt.volume == 0) return 0f;
+            ratio = bt.volume / (float) Math.max(1, bt.volumeMax);
+        } else if (audioManager != null) {
+            int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (cur == 0) return 0f;
+            if (max > 0) ratio = cur / (float) max;
+        }
+        if (ratio < 0) return 1f;
+        // 1/40 → 1.0 ; 25 % → ~0.42 ; 100 % → 0.22
+        return Math.max(0.22f, Math.min(1f, 0.22f / (float) Math.sqrt(Math.max(0.01f, ratio)) * 0.95f));
     }
 
     /**

@@ -98,5 +98,10 @@
             android:id="@+id/btnAndroidSettings"
             style="@style/SettingsRow"
             android:text="@string/settings_android" />
+
+        <TextView
+            android:id="@+id/btnDiagnostics"
+            style="@style/SettingsRow"
+            android:text="@string/settings_diagnostics" />
     </LinearLayout>
 </ScrollView>
