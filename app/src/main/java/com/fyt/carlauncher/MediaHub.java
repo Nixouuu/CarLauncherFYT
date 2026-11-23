@@ -255,7 +255,9 @@ final class MediaHub {
         if (!started) return;
         if (controller != null) {
             // Une app Android en pause était affichée : si l'iPhone se met à jouer, le lecteur passe sur lui.
-            if (code == FytBt.U_BTAV_PLAY_STATE && fyt.btavPlaying && !isPlaying(controller.getPlaybackState())) {
+            // MediaHub.this.fyt : champ final affecté dans le constructeur, après ce champ (règle d'affectation Java).
+            if (code == FytBt.U_BTAV_PLAY_STATE && MediaHub.this.fyt.btavPlaying
+                    && !isPlaying(controller.getPlaybackState())) {
                 refreshSessions();
             }
             return;
