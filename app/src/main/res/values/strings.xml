@@ -69,7 +69,7 @@
     <string name="call_keypad">Clavier</string>
     <string name="call_audio_phone">Sur le téléphone</string>
     <string name="call_audio_car">Sur la voiture</string>
-    <string name="settings_diagnostics">Diagnostic Bluetooth</string>
+    <string name="settings_diagnostics">Diagnostic de l\'autoradio</string>
 
     <!-- Navigation -->
     <string name="nav_where_to">Où aller ?</string>
@@ -98,4 +98,9 @@
     <string name="settings_nav_voice">Voix de navigation</string>
     <string name="settings_voice_test">Tester la voix de navigation</string>
     <string name="map_attribution_stadia">© Stadia Maps © OpenMapTiles © OpenStreetMap</string>
+    <string name="diag_send">Envoyer sur GitHub</string>
+    <string name="diag_sending">Envoi du diagnostic sur GitHub…</string>
+    <string name="diag_sent">Diagnostic envoyé sur GitHub (n° %1$d).</string>
+    <string name="diag_send_failed">Envoi du diagnostic impossible : %1$s</string>
+    <string name="diag_no_token">Envoi impossible : jeton GitHub absent du build (secret DIAG_TOKEN).</string>
 </resources>

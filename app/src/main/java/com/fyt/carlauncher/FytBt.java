@@ -127,17 +127,38 @@ final class FytBt {
 
     // ---------------------------------------------------------------- connexion
 
-    /** Se connecte au service FYT (sans effet si déjà connecté ou absent). */
+    /** Résultat de chaque tentative de connexion (écran Diagnostic et rapport GitHub). */
+    final List<String> bindAttempts = new ArrayList<>();
+
+    /**
+     * Se connecte au service FYT (sans effet si déjà connecté ou absent).
+     *
+     * La classe du service s'appelle littéralement « app.ToolkitService » dans le paquet com.syu.ms
+     * (notation com.syu.ms/app.ToolkitService) : ce n'est PAS « com.syu.ms.app.ToolkitService ».
+     * On essaie d'abord le nom exact, puis des variantes, et on note le résultat de chacune.
+     */
     void connect() {
         if (toolkit != null || binding) return;
-        Intent intent = new Intent(ACTION).setComponent(new ComponentName(PKG, PKG + "." + SERVICE));
-        try {
-            binding = app.bindService(intent, connection, Context.BIND_AUTO_CREATE);
-        } catch (Exception e) {
-            binding = false;
+        Intent[] candidates = {
+                new Intent(ACTION).setComponent(new ComponentName(PKG, SERVICE)),
+                new Intent(ACTION).setComponent(new ComponentName(PKG, PKG + "." + SERVICE)),
+                new Intent(ACTION).setPackage(PKG),
+        };
+        bindAttempts.clear();
+        for (Intent intent : candidates) {
+            String what = intent.getComponent() != null ? intent.getComponent().flattenToShortString()
+                    : "action " + ACTION + " + paquet " + PKG;
+            try {
+                binding = app.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+                bindAttempts.add(what + " → " + (binding ? "OK" : "refusé (false)"));
+            } catch (Exception e) {
+                binding = false;
+                bindAttempts.add(what + " → " + e.getClass().getSimpleName() + " : " + e.getMessage());
+            }
+            note("bindService " + bindAttempts.get(bindAttempts.size() - 1));
+            if (binding) break;
         }
         status = binding ? "connexion…" : "service FYT absent";
-        if (!binding) note("bindService refusé ou com.syu.ms absent");
     }
 
     boolean isReady() {
@@ -477,16 +498,55 @@ final class FytBt {
 
     /** Journal des derniers échanges avec le service FYT (écran Diagnostic). */
     String dump() {
+        return dump(false);
+    }
+
+    /**
+     * @param anonymous true pour le rapport envoyé sur GitHub (dépôt public) : ni numéros, ni noms de contacts,
+     *                  ni nom du téléphone. Seuls les codes, les états et la longueur des valeurs restent.
+     */
+    String dump(boolean anonymous) {
         StringBuilder sb = new StringBuilder();
         sb.append("Service : ").append(status).append('\n')
-                .append("Téléphone : état=").append(phoneState).append(" nom=").append(phoneName)
-                .append(" numéro=").append(callNumber).append('\n')
-                .append("Musique BT : ").append(btavTitle).append(" / ").append(btavArtist)
+                .append("Modules : BT=").append(btModule != null).append(" principal=").append(mainModule != null)
+                .append(" son=").append(soundModule != null).append('\n')
+                .append("Téléphone : état=").append(phoneState)
+                .append(" nom=").append(anonymous ? mask(phoneName) : phoneName)
+                .append(" numéro=").append(anonymous ? mask(callNumber) : callNumber).append('\n')
+                .append("Audio d'appel sur le téléphone : ").append(audioOnPhone).append('\n')
+                .append("Musique BT : ").append(anonymous ? mask(btavTitle) : btavTitle).append(" / ")
+                .append(anonymous ? mask(btavArtist) : btavArtist)
                 .append(btavPlaying ? " (lecture)" : " (pause)").append('\n')
-                .append("Contacts reçus : ").append(contacts.size()).append("\n\n");
+                .append("Volume : ").append(volume).append('/').append(volumeMax).append(muted ? " (sourdine)" : "").append('\n')
+                .append("Contacts reçus : ").append(contacts.size()).append('\n');
+        sb.append("Tentatives de connexion :\n");
+        for (String a : bindAttempts) sb.append("  ").append(a).append('\n');
+        sb.append('\n');
         synchronized (log) {
-            for (String l : log) sb.append(l).append('\n');
+            for (String l : log) sb.append(anonymous ? anonymize(l) : l).append('\n');
         }
         return sb.toString();
+    }
+
+    private static String mask(String s) {
+        return s == null ? "null" : "<" + s.length() + " car.>";
+    }
+
+    /**
+     * Lignes « ← uN <ints> <strs> » et « → cmd N <ints> <strs> » (ints/strs = « null » ou « [a, b] ») :
+     * chaque texte de <strs> est remplacé par sa longueur (sauf les index « 0 »/« 1 »). Le reste est gardé.
+     */
+    private static String anonymize(String line) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^(.*?(?:← u|→ cmd )\\d+ )(null|\\[[^\\]]*\\]) (\\[.*\\])$").matcher(line);
+        if (!m.matches()) return line;
+        String inner = m.group(3).substring(1, m.group(3).length() - 1);
+        StringBuilder masked = new StringBuilder();
+        for (String part : inner.split(", ", -1)) {
+            if (masked.length() > 0) masked.append(", ");
+            String t = part.trim();
+            masked.append(t.equals("null") || t.isEmpty() || t.matches("\\d{1,2}") ? part : "<" + part.length() + " car.>");
+        }
+        return m.group(1) + m.group(2) + " [" + masked + "]";
     }
 }

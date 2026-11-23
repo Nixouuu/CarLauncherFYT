@@ -81,6 +81,11 @@ public class MainActivity extends Activity {
         }
     };
 
+    /** Retiré dans onDestroy : FytBt est un singleton, il ne doit pas garder l'Activity en vie. */
+    private final FytBt.Listener fytListener = code -> {
+        if (code == FytBt.U_PHONE_NAME || code == FytBt.U_PHONE_STATE || code == -1) refreshShortcutLabels();
+    };
+
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -112,14 +117,15 @@ public class MainActivity extends Activity {
         liveMap.setup();
         navigator = new Navigator(this, liveMap.map(), liveMap);
         liveMap.setLocationObserver(navigator::onLocation);
+        liveMap.setSnapper(navigator::snapped);   // en guidage, la voiture est collée au tracé
         placeSearch = new PlaceSearch(this, prefs, sound, liveMap, navigator);
 
         fyt = FytBt.get(this);
         fyt.connect();
         CallActivity.watchCalls(this);
-        fyt.addListener(code -> {
-            if (code == FytBt.U_PHONE_NAME || code == FytBt.U_PHONE_STATE || code == -1) refreshShortcutLabels();
-        });
+        fyt.addListener(fytListener);
+        DiagReport.setExtra(() -> liveMap.stats() + "\n" + navigator.status() + "\n" + navigator.voiceStatus());
+        DiagReport.start(this);
         mediaHub = new MediaHub(this, prefs,
                 new ComponentName(this, CarNotificationListenerService.class));
 
@@ -265,6 +271,7 @@ public class MainActivity extends Activity {
         refreshShortcutLabels();
         liveMap.start();
         mediaHub.start();
+        checkOtaUpdate();
 
         IntentFilter timeFilter = new IntentFilter();
         timeFilter.addAction(Intent.ACTION_TIME_TICK);
@@ -294,6 +301,8 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         try { unregisterReceiver(packageReceiver); } catch (IllegalArgumentException ignored) {}
+        if (fyt != null) fyt.removeListener(fytListener);
+        DiagReport.setExtra(null);
         if (navigator != null) navigator.release();
         executor.shutdownNow();
     }
@@ -321,8 +330,20 @@ public class MainActivity extends Activity {
         if (requestCode == REQ_LOCATION) liveMap.onPermissionResult();
     }
 
+    private static final long OTA_CHECK_INTERVAL_MS = 30 * 60_000;
+    private long lastOtaCheckAt;
+
+    /**
+     * Le launcher (accueil, singleTask) n'est presque jamais recréé : vérifier seulement dans onCreate
+     * ratait les nouvelles versions publiées après le démarrage. On revérifie donc au retour à l'accueil,
+     * au plus une fois toutes les 30 min.
+     */
     private void checkOtaUpdate() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (lastOtaCheckAt != 0 && now - lastOtaCheckAt < OTA_CHECK_INTERVAL_MS) return;
+        lastOtaCheckAt = now;
         OtaUpdater.checkForUpdate(this, executor, (latestTag, downloadUrl) -> {
+            if (isFinishing() || isDestroyed()) return;
             pendingUpdateUrl = downloadUrl;
             btnOtaUpdate.setVisibility(View.VISIBLE);
         });
@@ -396,10 +417,13 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Journal des échanges avec le Bluetooth FYT (pour déboguer appels et contacts sur l'autoradio). */
+    /**
+     * Journal des échanges avec le Bluetooth FYT (pour déboguer appels et contacts sur l'autoradio).
+     * « Envoyer sur GitHub » envoie le rapport complet (anonymisé) sans clé USB ni photo.
+     */
     private void showDiagnostics() {
         TextView text = new TextView(this);
-        text.setText(navigator.voiceStatus() + "\n" + fyt.dump());
+        text.setText(navigator.voiceStatus() + "\n" + liveMap.stats() + "\n" + fyt.dump());
         text.setTextColor(0xFFFFFFFF);
         text.setTextSize(12);
         text.setTypeface(android.graphics.Typeface.MONOSPACE);
@@ -412,6 +436,7 @@ public class MainActivity extends Activity {
                 .setTitle(R.string.settings_diagnostics)
                 .setView(scroll)
                 .setPositiveButton(R.string.settings_close, null)
+                .setNegativeButton(R.string.diag_send, (d, w) -> DiagReport.sendWithToast(this))
                 .setNeutralButton(R.string.phone_sync, (d, w) -> fyt.downloadContacts())
                 .show();
     }

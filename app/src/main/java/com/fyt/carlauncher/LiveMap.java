@@ -25,11 +25,14 @@ import org.osmdroid.views.overlay.Marker;
 /**
  * Carte + position de la voiture + vitesse.
  *
- * - GPS demandé à chaque fix (≈1 Hz), plus de filtre « 2 s / 3 m » qui figeait la vitesse.
- * - Entre deux fix, la voiture glisse en continu (interpolation linéaire ~30 i/s) au lieu de se téléporter.
- * - Vitesse filtrée : 0 à l'arrêt (hystérésis 4/6 km/h + rejet des fix imprécis),
- *   « -- » si plus de signal GPS depuis 4 s.
- * - Carte OpenStreetMap toujours sombre (filtre de couleurs, voir MapTiles).
+ * - GPS demandé à chaque fix (≈1 Hz).
+ * - Entre deux fix, la voiture glisse en continu (~30 i/s) vers l'endroit où elle sera au prochain fix
+ *   (position GPS + vitesse × intervalle) : sans cette anticipation, elle était dessinée ~1 s en retard
+ *   (≈15 m à 50 km/h), donc toujours décalée derrière la vraie voiture.
+ * - En guidage, la voiture est collée au tracé de l'itinéraire et orientée comme la route (voir Navigator.snapped).
+ * - Vitesse affichée telle que mesurée à chaque fix (pas d'interpolation entre deux valeurs),
+ *   0 à l'arrêt (hystérésis 3/5 km/h), « -- » si plus de signal GPS depuis 4 s.
+ * - Carte toujours sombre (Stadia, ou OpenStreetMap filtré, voir MapTiles).
  */
 final class LiveMap implements LocationListener {
 
@@ -37,11 +40,30 @@ final class LiveMap implements LocationListener {
     private static final double DEFAULT_LON = -73.5673;
     private static final double DEFAULT_ZOOM = 16.0;
 
-    private static final float START_MOVING_KMH = 6f;    // en dessous, on reste « à l'arrêt »
-    private static final float STOP_MOVING_KMH = 4f;     // en dessous, on repasse « à l'arrêt »
+    private static final float START_MOVING_KMH = 5f;    // en dessous, on reste « à l'arrêt »
+    private static final float STOP_MOVING_KMH = 3f;     // en dessous, on repasse « à l'arrêt »
     private static final float MAX_ACCURACY_M = 30f;     // fix plus imprécis : ignoré pour la vitesse
     private static final long GPS_STALE_MS = 4000;
     private static final long FRAME_MS = 33;
+    /** Anticipation maximale (m) quand on prolonge en ligne droite hors guidage. */
+    private static final float MAX_LEAD_M = 35f;
+
+    /** Fournit la position collée au trajet (guidage) : {lat, lon, cap} ou null. */
+    interface Snapper {
+        double[] snapped(double aheadM);
+    }
+
+    private Snapper snapper;
+
+    void setSnapper(Snapper s) {
+        snapper = s;
+    }
+
+    // ---- Statistiques GPS pour le diagnostic (aucune coordonnée : le rapport est public)
+    private int statFixes, statWithBearing, statWithSpeed, statSnapped;
+    private long statIntervalSumMs, statIntervalCount;
+    private float statLastAccuracy = -1f, statLastSpeedKmh = -1f;
+    private String statProvider = "aucun";
 
     private final Activity activity;
     private final MapView map;
@@ -267,7 +289,8 @@ final class LiveMap implements LocationListener {
             return;   // GPS actif : on ignore le réseau, moins précis
         }
         lastAccepted = loc;
-        if (observer != null) observer.onLocation(loc);
+        recordStats(loc, gps);
+        if (observer != null) observer.onLocation(loc);   // Navigator d'abord : il met à jour l'accrochage au trajet
 
         if (!hasPosition || lastFix == null) {
             jumpTo(loc);
@@ -276,6 +299,10 @@ final class LiveMap implements LocationListener {
         }
 
         float targetSpeed = gps ? filteredSpeedKmh(loc) : -1f;
+        // Vitesse affichée immédiatement, telle que mesurée (plus d'interpolation sur 1 s).
+        showSpeed(targetSpeed);
+
+        long dtMs = (loc.getElapsedRealtimeNanos() - lastFix.getElapsedRealtimeNanos()) / 1_000_000L;
 
         // À l'arrêt, on ne déplace pas la voiture pour un simple bruit de position.
         double toLat = loc.getLatitude();
@@ -296,18 +323,71 @@ final class LiveMap implements LocationListener {
         } else if (moving && lastFix.distanceTo(loc) > 4f) {
             toBearing = lastFix.bearingTo(loc);
         }
-
-        long dtMs = (loc.getElapsedRealtimeNanos() - lastFix.getElapsedRealtimeNanos()) / 1_000_000L;
         lastFix = loc;
+
+        // Anticipation : on vise l'endroit où la voiture sera au prochain fix (≈ dtMs plus tard).
+        if (moving && gps && dtMs > 0 && dtMs <= 3000) {
+            float speedMs = loc.hasSpeed() ? loc.getSpeed() : 0f;
+            double lead = speedMs * (dtMs / 1000.0);
+            double[] snap = snapper != null ? snapper.snapped(lead) : null;
+            if (snap != null) {
+                // Guidage : collé au tracé, orienté comme la route.
+                toLat = snap[0];
+                toLon = snap[1];
+                toBearing = (float) snap[2];
+                statSnapped++;
+            } else {
+                double l = Math.min(lead, MAX_LEAD_M);
+                double rad = Math.toRadians(toBearing);
+                toLat += (l * Math.cos(rad)) / 111320.0;
+                toLon += (l * Math.sin(rad)) / (111320.0 * Math.cos(Math.toRadians(toLat)));
+            }
+        } else if (snapper != null) {
+            double[] snap = snapper.snapped(0);
+            if (snap != null) {
+                toLat = snap[0];
+                toLon = snap[1];
+                if (moving) toBearing = (float) snap[2];
+                statSnapped++;
+            }
+        }
 
         float[] jump = new float[1];
         Location.distanceBetween(shownLat, shownLon, toLat, toLon, jump);
         if (dtMs <= 0 || dtMs > 5000 || jump[0] > 500f) {
             applyFrame(toLat, toLon, toBearing);
-            showSpeed(targetSpeed);
             return;
         }
-        animateTo(toLat, toLon, toBearing, targetSpeed, dtMs);
+        animateTo(toLat, toLon, toBearing, dtMs);
+    }
+
+    private void recordStats(Location loc, boolean gps) {
+        statFixes++;
+        statProvider = loc.getProvider();
+        if (loc.hasBearing()) statWithBearing++;
+        if (loc.hasSpeed()) statWithSpeed++;
+        statLastAccuracy = loc.hasAccuracy() ? loc.getAccuracy() : -1f;
+        statLastSpeedKmh = loc.hasSpeed() ? loc.getSpeed() * 3.6f : -1f;
+        if (gps && lastAccepted != null && lastFix != null) {
+            long dt = (loc.getElapsedRealtimeNanos() - lastFix.getElapsedRealtimeNanos()) / 1_000_000L;
+            if (dt > 0 && dt < 10000) {
+                statIntervalSumMs += dt;
+                statIntervalCount++;
+            }
+        }
+    }
+
+    /** Résumé GPS pour l'écran Diagnostic et le rapport GitHub (aucune coordonnée). */
+    String stats() {
+        int pct = statFixes > 0 ? 100 : 0;
+        return "GPS : fix=" + statFixes + " source=" + statProvider
+                + " intervalle moyen=" + (statIntervalCount > 0 ? statIntervalSumMs / statIntervalCount + " ms" : "?")
+                + " précision=" + (statLastAccuracy >= 0 ? Math.round(statLastAccuracy) + " m" : "?")
+                + " vitesse brute=" + (statLastSpeedKmh >= 0 ? Math.round(statLastSpeedKmh) + " km/h" : "?")
+                + " avec cap=" + (statFixes > 0 ? statWithBearing * pct / statFixes : 0) + "%"
+                + " avec vitesse=" + (statFixes > 0 ? statWithSpeed * pct / statFixes : 0) + "%"
+                + " collé au trajet=" + statSnapped
+                + " suivi=" + following + " orientation carte=" + Math.round(map.getMapOrientation()) + "°";
     }
 
     /** Vitesse en km/h avec hystérésis et rejet des fix imprécis. */
@@ -316,8 +396,9 @@ final class LiveMap implements LocationListener {
         if (loc.hasSpeed()) {
             kmh = loc.getSpeed() * 3.6f;
             if (Build.VERSION.SDK_INT >= 26 && loc.hasSpeedAccuracy()) {
-                // Vitesse indiscernable de son incertitude → considérée nulle.
-                if (loc.getSpeed() < 1.5f * loc.getSpeedAccuracyMetersPerSecond()) kmh = 0f;
+                // Très basse vitesse indiscernable de son incertitude → considérée nulle (seulement < 7 km/h :
+                // au-dessus, on affiche toujours la vraie vitesse mesurée).
+                if (loc.getSpeed() < 2f && loc.getSpeed() < 1.5f * loc.getSpeedAccuracyMetersPerSecond()) kmh = 0f;
             }
         } else if (lastFix != null) {
             long dt = (loc.getElapsedRealtimeNanos() - lastFix.getElapsedRealtimeNanos()) / 1_000_000L;
@@ -340,13 +421,11 @@ final class LiveMap implements LocationListener {
         if (following) map.getController().setCenter(new GeoPoint(shownLat, shownLon));
     }
 
-    private void animateTo(final double toLat, final double toLon, float toBearing,
-                           final float toSpeed, long durationMs) {
+    private void animateTo(final double toLat, final double toLon, float toBearing, long durationMs) {
         if (animator != null) animator.cancel();
         final double fromLat = shownLat, fromLon = shownLon;
         final float fromBearing = shownBearing;
         final float bearingDelta = shortestAngle(fromBearing, toBearing);
-        final float fromSpeed = shownSpeed < 0 ? toSpeed : shownSpeed;
 
         // Légèrement plus long que l'intervalle entre fix : la voiture ne marque jamais d'arrêt.
         animator = ValueAnimator.ofFloat(0f, 1f);
@@ -360,10 +439,8 @@ final class LiveMap implements LocationListener {
             applyFrame(fromLat + (toLat - fromLat) * f,
                     fromLon + (toLon - fromLon) * f,
                     fromBearing + bearingDelta * f);
-            if (toSpeed >= 0) showSpeed(fromSpeed + (toSpeed - fromSpeed) * f);
         });
         animator.start();
-        if (toSpeed < 0) showSpeed(-1f);
     }
 
     private void applyFrame(double lat, double lon, float bearing) {
@@ -378,8 +455,12 @@ final class LiveMap implements LocationListener {
             map.setMapOrientation(-bearing, false);
             map.getController().setCenter(p);
         }
-        // Flèche à l'écran = cap de la voiture + rotation de la carte (0 = vers le haut quand on suit).
-        marker.setRotation(-(bearing + map.getMapOrientation()));
+        // Marqueur « plat » (setFlat(true)) : osmdroid le dessine dans le repère de la carte (déjà tournée),
+        // en tournant de -rotation. Pour pointer vers le cap (degrés depuis le nord, sens horaire), la rotation
+        // est donc simplement -cap, quelle que soit l'orientation de la carte. L'ancien calcul
+        // -(cap + orientation) donnait 0 en mode « cap en haut » : la flèche pointait vers le nord de la carte,
+        // pas dans le sens de marche.
+        marker.setRotation(-bearing);
         if (!following) map.invalidate();
     }
 

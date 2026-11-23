@@ -35,9 +35,14 @@ import java.util.Locale;
  */
 final class Navigator {
 
-    private static final float OFF_ROUTE_M = 55f;
+    /** Hors trajet au-delà de cette distance (élargie si le GPS annonce une mauvaise précision). */
+    private static final float OFF_ROUTE_MIN_M = 30f, OFF_ROUTE_MAX_M = 60f;
+    /** En dessous, la voiture est dessinée exactement sur le trajet (« collée à la route »). */
+    private static final float SNAP_M = 35f;
+    /** Écart de cap au-delà duquel on roule dans le mauvais sens du trajet. */
+    private static final float WRONG_WAY_DEG = 120f;
     private static final float ARRIVED_M = 35f;
-    private static final long REROUTE_MIN_INTERVAL_MS = 15000;
+    private static final long REROUTE_MIN_INTERVAL_MS = 8000;
 
     private final Activity activity;
     private final MapView map;
@@ -59,6 +64,12 @@ final class Navigator {
     private int offRouteCount;
     private long lastRerouteAt;
     private boolean active, routing;
+    // Dernier « accrochage » au trajet : distance parcourue le long du trajet et validité.
+    private double lastAlong;
+    private boolean onRoute;
+    private int reroutes;
+    private String lastRouteError;
+    private final Runnable stopAfterArrival = this::stop;
 
     Navigator(Activity activity, MapView map, LiveMap liveMap) {
         this.activity = activity;
@@ -81,9 +92,16 @@ final class Navigator {
     // ---------------------------------------------------------------- démarrage / arrêt
 
     void navigateTo(String name, double lat, double lon) {
+        // Une arrivée précédente avait programmé un arrêt dans 6 s : il ne doit pas couper ce nouveau trajet.
+        map.removeCallbacks(stopAfterArrival);
         destName = name;
         destLat = lat;
         destLon = lon;
+        route = null;
+        removeLines();
+        onRoute = false;
+        reroutes = 0;
+        lastRouteError = null;
         ensureTts();
         Location here = liveMap.lastLocation();
         if (here == null) {
@@ -102,9 +120,11 @@ final class Navigator {
     }
 
     void stop() {
+        map.removeCallbacks(stopAfterArrival);
         active = false;
         routing = false;
         route = null;
+        onRoute = false;
         removeLines();
         banner.setVisibility(View.GONE);
         bottomBar.setVisibility(View.GONE);
@@ -148,10 +168,15 @@ final class Navigator {
             routing = false;
             if (!active) return;
             if (r == null || r.shape.size() < 2) {
+                // On garde l'ancien trajet s'il existe ; sinon onLocation() redemandera dans quelques secondes.
+                boolean firstError = lastRouteError == null;   // dit une seule fois, pas à chaque nouvel essai
+                lastRouteError = error != null ? error : "trajet vide";
                 tvInstruction.setText(R.string.nav_route_error);
-                if (firstTime) speak(activity.getString(R.string.nav_route_error));
+                if (firstTime && firstError) speak(activity.getString(R.string.nav_route_error));
                 return;
             }
+            lastRouteError = null;
+            if (!firstTime) reroutes++;
             setRoute(r);
             if (firstTime) {
                 speak(activity.getString(R.string.nav_start_spoken, destName));
@@ -208,36 +233,62 @@ final class Navigator {
 
     /** Appelé à chaque position GPS. */
     void onLocation(Location loc) {
-        if (!active || route == null) return;
+        if (!active) return;
+        if (route == null) {
+            // Premier calcul raté (pas d'Internet, erreur Stadia…) : on réessaie tout seul.
+            if (!routing && SystemClock.elapsedRealtime() - lastRerouteAt > REROUTE_MIN_INTERVAL_MS) {
+                tvInstruction.setText(R.string.nav_computing);
+                requestRoute(loc, true);
+            }
+            return;
+        }
         List<GeoPoint> shape = route.shape;
         GeoPoint here = new GeoPoint(loc.getLatitude(), loc.getLongitude());
+        boolean movingFast = loc.hasSpeed() && loc.getSpeed() > 4f;            // > ~15 km/h : cap GPS fiable
+        float carBearing = movingFast && loc.hasBearing() ? loc.getBearing() : -1f;
 
-        // Point du trajet le plus proche, en cherchant autour de la progression actuelle.
-        int from = Math.max(0, progressIndex - 3);
-        int to = Math.min(shape.size() - 2, progressIndex + 80);
-        double best = Double.MAX_VALUE;
-        int bestSeg = progressIndex;
-        double bestT = 0;
-        for (int i = from; i <= to; i++) {
-            double[] pr = project(here, shape.get(i), shape.get(i + 1));
-            if (pr[0] < best) {
-                best = pr[0];
-                bestSeg = i;
-                bestT = pr[1];
+        // Segment du trajet le plus proche, en préférant ceux orientés dans notre sens de marche
+        // (sinon, sur un trajet qui revient sur ses pas, on s'accrocherait à la mauvaise branche).
+        int[] seg = new int[1];
+        double[] tOut = new double[1];
+        double best = match(here, carBearing, Math.max(0, progressIndex - 10),
+                Math.min(shape.size() - 2, progressIndex + 250), seg, tOut);
+        if (best > SNAP_M) {
+            // Rien autour de la progression : on cherche sur tout le trajet (saut GPS, raccourci…).
+            int[] seg2 = new int[1];
+            double[] t2 = new double[1];
+            double best2 = match(here, carBearing, 0, shape.size() - 2, seg2, t2);
+            if (best2 < best) {
+                best = best2;
+                seg[0] = seg2[0];
+                tOut[0] = t2[0];
             }
         }
+        int bestSeg = seg[0];
+        double bestT = tOut[0];
+        double distToRoute = project(here, shape.get(bestSeg), shape.get(bestSeg + 1))[0];
+        boolean wrongWay = carBearing >= 0
+                && angleDiff(carBearing, segmentBearing(bestSeg)) > WRONG_WAY_DEG;
+
         progressIndex = bestSeg;
         double along = cumulative[bestSeg] + bestT * (cumulative[bestSeg + 1] - cumulative[bestSeg]);
         double total = cumulative[cumulative.length - 1];
         double remaining = Math.max(0, total - along);
+        lastAlong = along;
+        onRoute = distToRoute <= SNAP_M && !wrongWay;
 
-        // Hors trajet ? (3 positions de suite, et pas trop souvent)
-        if (best > OFF_ROUTE_M) {
+        // Hors trajet ou à contresens : 2 positions de suite suffisent, puis au plus un recalcul toutes les 8 s.
+        float accuracy = loc.hasAccuracy() ? loc.getAccuracy() : 15f;
+        double offThreshold = Math.max(OFF_ROUTE_MIN_M, Math.min(OFF_ROUTE_MAX_M, accuracy * 1.5 + 15));
+        if (distToRoute > offThreshold || wrongWay) {
             offRouteCount++;
-            if (offRouteCount >= 3 && SystemClock.elapsedRealtime() - lastRerouteAt > REROUTE_MIN_INTERVAL_MS) {
+            if (offRouteCount >= 2 && !routing
+                    && SystemClock.elapsedRealtime() - lastRerouteAt > REROUTE_MIN_INTERVAL_MS) {
                 tvInstruction.setText(R.string.nav_computing);
+                tvDistance.setText("");
                 requestRoute(loc, false);
             }
+            if (offRouteCount >= 2) return;   // consignes de l'ancien trajet fausses : on attend le nouveau
         } else {
             offRouteCount = 0;
         }
@@ -249,8 +300,11 @@ final class Navigator {
             tvDistance.setText("");
             imgArrow.setImageResource(R.drawable.ic_flag);
             imgArrow.setRotation(0);
-            map.postDelayed(this::stop, 6000);
+            map.removeCallbacks(stopAfterArrival);
+            map.postDelayed(stopAfterArrival, 6000);
             route = null;
+            onRoute = false;
+            active = false;   // plus de recalcul ni de nouvelle demande d'itinéraire après l'arrivée
             return;
         }
 
@@ -303,6 +357,79 @@ final class Navigator {
         double t = len2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
         double cx = ax + t * dx, cy = ay + t * dy;
         return new double[]{Math.sqrt(cx * cx + cy * cy), t};
+    }
+
+    /**
+     * Segment le plus proche entre from et to (inclus). Un segment orienté à contresens de la voiture
+     * est pénalisé de 60 m pour qu'une branche du trajet dans notre sens gagne.
+     * @return distance « pénalisée » ; seg[0] et t[0] reçoivent le segment et la position sur ce segment.
+     */
+    private double match(GeoPoint here, float carBearing, int from, int to, int[] seg, double[] t) {
+        List<GeoPoint> shape = route.shape;
+        double best = Double.MAX_VALUE;
+        seg[0] = Math.max(0, Math.min(progressIndex, shape.size() - 2));
+        t[0] = 0;
+        for (int i = from; i <= to; i++) {
+            double[] pr = project(here, shape.get(i), shape.get(i + 1));
+            double d = pr[0];
+            if (carBearing >= 0 && cumulative[i + 1] - cumulative[i] > 1
+                    && angleDiff(carBearing, segmentBearing(i)) > 90) {
+                d += 60;
+            }
+            if (d < best) {
+                best = d;
+                seg[0] = i;
+                t[0] = pr[1];
+            }
+        }
+        return best;
+    }
+
+    private float segmentBearing(int i) {
+        List<GeoPoint> shape = route.shape;
+        return (float) shape.get(i).bearingTo(shape.get(i + 1));
+    }
+
+    static float angleDiff(float a, float b) {
+        float d = Math.abs(((a - b) % 360f + 540f) % 360f - 180f);
+        return d;
+    }
+
+    /**
+     * Position « collée au trajet » pour dessiner la voiture : point du trajet situé aheadM mètres après la
+     * dernière position GPS projetée, avec le cap de la route à cet endroit.
+     * @return {lat, lon, cap} ou null si on n'est pas sur le trajet (hors trajet, contresens, pas de guidage).
+     */
+    double[] snapped(double aheadM) {
+        if (!active || route == null || !onRoute || cumulative == null) return null;
+        double target = Math.min(lastAlong + Math.max(0, aheadM), cumulative[cumulative.length - 1]);
+        int i = progressIndex;
+        while (i < cumulative.length - 2 && cumulative[i + 1] < target) i++;
+        while (i > 0 && cumulative[i] > target) i--;
+        double len = cumulative[i + 1] - cumulative[i];
+        double f = len > 0 ? Math.max(0, Math.min(1, (target - cumulative[i]) / len)) : 0;
+        GeoPoint a = route.shape.get(i), b = route.shape.get(i + 1);
+        // Segment très court (point en double) : on prend le cap du segment suivant non nul.
+        int j = i;
+        while (j < cumulative.length - 2 && cumulative[j + 1] - cumulative[j] < 1) j++;
+        return new double[]{
+                a.getLatitude() + (b.getLatitude() - a.getLatitude()) * f,
+                a.getLongitude() + (b.getLongitude() - a.getLongitude()) * f,
+                segmentBearing(j)};
+    }
+
+    /** État du guidage pour le diagnostic (sans position ni destination : le rapport est public). */
+    String status() {
+        return "Navigation : active=" + active + " calcul=" + routing
+                + (route != null ? " points=" + route.shape.size() + " manœuvres=" + route.maneuvers.size()
+                + " progression=" + progressIndex + " surTrajet=" + onRoute : " (pas de trajet)")
+                + " horsTrajet=" + offRouteCount + " recalculs=" + reroutes
+                + (lastRouteError != null ? " dernièreErreur=" + safeError(lastRouteError) : "");
+    }
+
+    private static String safeError(String e) {
+        String s = e.replaceAll("api_key=[^&\\s\"]*", "api_key=…");
+        return s.length() > 160 ? s.substring(0, 160) + "…" : s;
     }
 
     /** Flèche selon le type de manœuvre Valhalla. */

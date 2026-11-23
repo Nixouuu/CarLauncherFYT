@@ -18,6 +18,10 @@ android {
         // Clé Stadia Maps : secret GitHub STADIA_API_KEY (CI) ou propriété -PstadiaApiKey=… en local. Jamais dans le code.
         def stadiaKey = System.getenv("STADIA_API_KEY") ?: (project.findProperty("stadiaApiKey") ?: "")
         buildConfigField "String", "STADIA_API_KEY", "\"${stadiaKey}\""
+        // Jeton GitHub pour l'envoi automatique du diagnostic (issues) : secret DIAG_TOKEN (CI) ou -PdiagToken=… en local.
+        // Jeton « fine-grained » limité à ce dépôt, permission « Issues : Read and write » uniquement.
+        def diagToken = System.getenv("DIAG_TOKEN") ?: (project.findProperty("diagToken") ?: "")
+        buildConfigField "String", "DIAG_TOKEN", "\"${diagToken}\""
     }
 
     signingConfigs {
