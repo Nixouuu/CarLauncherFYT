@@ -161,7 +161,8 @@ final class FytBt {
         bindAttempts.add("  pas de réponse en " + BIND_TIMEOUT_MS / 1000 + " s : variante suivante");
         note("bindService : pas de réponse, variante suivante");
         try {
-            app.unbindService(FytBt.this.connection);   // nom qualifié : « connection » est déclaré plus bas
+            // Noms qualifiés : « connection » est déclaré plus bas et « app » est affecté dans le constructeur.
+            FytBt.this.app.unbindService(FytBt.this.connection);
         } catch (Exception ignored) {
         }
         binding = false;
