@@ -35,6 +35,7 @@ jobs:
           KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
           STADIA_API_KEY: ${{ secrets.STADIA_API_KEY }}
           DIAG_TOKEN: ${{ secrets.DIAG_TOKEN }}
+          DIAG_REPO: ${{ vars.DIAG_REPO }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore

@@ -20,7 +20,7 @@ final class SettingsDialog {
 
     private SettingsDialog() {}
 
-    static void show(Activity activity, final SharedPreferences prefs, final ClickSound sound, final Actions actions) {
+    static AlertDialog show(Activity activity, final SharedPreferences prefs, final ClickSound sound, final Actions actions) {
         View root = activity.getLayoutInflater().inflate(R.layout.dialog_settings, null);
         final Switch swEnabled = root.findViewById(R.id.swSoundEnabled);
         final Switch swAdaptive = root.findViewById(R.id.swSoundAdaptive);
@@ -92,6 +92,7 @@ final class SettingsDialog {
             actions.openAndroidSettings();
         });
         dialog.show();
+        return dialog;
     }
 
     private static void setSoundControlsEnabled(boolean on, View row, SeekBar seek, View test, Switch adaptive) {

@@ -29,13 +29,20 @@ public class OtaUpdater {
 
     public interface UpdateCallback {
         void onUpdateAvailable(String latestTag, String downloadUrl);
+
+        /** Vérification impossible (pas d'Internet, GitHub indisponible) : à réessayer bientôt. */
+        default void onCheckFailed() {}
     }
+
+    /** Un seul téléchargement à la fois (plusieurs appuis sur « MÀJ » ouvraient plusieurs installations). */
+    private static volatile boolean downloading;
 
     public static void checkForUpdate(final Context context, ExecutorService executor, final UpdateCallback callback) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
                 HttpURLConnection conn = null;
+                boolean checked = false;
                 try {
                     PackageInfo pInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
                     int currentCode = pInfo.versionCode;
@@ -54,6 +61,7 @@ public class OtaUpdater {
                     reader.close();
 
                     JSONObject json = new JSONObject(sb.toString());
+                    checked = true;   // réponse valide de GitHub, même s'il n'y a pas de nouvelle version
                     final String tag = json.optString("tag_name", "");
                     int remoteCode = parseBuildNumber(tag);
                     if (remoteCode <= currentCode) return;
@@ -81,6 +89,8 @@ public class OtaUpdater {
                 } catch (Exception ignored) {
                 } finally {
                     if (conn != null) conn.disconnect();
+                    // Dans finally : les « return » du bloc try (HTTP ≠ 200) passent aussi par ici.
+                    if (!checked) new Handler(Looper.getMainLooper()).post(callback::onCheckFailed);
                 }
             }
         });
@@ -101,6 +111,11 @@ public class OtaUpdater {
             return;
         }
 
+        if (downloading) {
+            Toast.makeText(context, R.string.update_downloading, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        downloading = true;
         Toast.makeText(context, R.string.update_downloading, Toast.LENGTH_SHORT).show();
         executor.execute(() -> {
             final Handler main = new Handler(Looper.getMainLooper());
@@ -136,6 +151,7 @@ public class OtaUpdater {
                 main.post(() -> Toast.makeText(context, R.string.update_failed, Toast.LENGTH_SHORT).show());
             } finally {
                 if (conn != null) conn.disconnect();
+                downloading = false;
             }
         });
     }

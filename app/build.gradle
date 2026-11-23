@@ -22,6 +22,9 @@ android {
         // Jeton « fine-grained » limité à ce dépôt, permission « Issues : Read and write » uniquement.
         def diagToken = System.getenv("DIAG_TOKEN") ?: (project.findProperty("diagToken") ?: "")
         buildConfigField "String", "DIAG_TOKEN", "\"${diagToken}\""
+        // Dépôt qui reçoit les rapports (« propriétaire/nom ») : variable GitHub DIAG_REPO, idéalement privé.
+        def diagRepo = System.getenv("DIAG_REPO") ?: (project.findProperty("diagRepo") ?: "")
+        buildConfigField "String", "DIAG_REPO", "\"${diagRepo}\""
     }
 
     signingConfigs {

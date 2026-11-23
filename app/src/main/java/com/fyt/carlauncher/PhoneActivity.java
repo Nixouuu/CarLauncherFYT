@@ -181,8 +181,7 @@ public class PhoneActivity extends Activity implements FytBt.Listener {
             FytBt.Contact c = items.get(position);
             ((TextView) view.findViewById(R.id.tvContactName)).setText(c.name);
             ((TextView) view.findViewById(R.id.tvContactNumber)).setText(c.number);
-            ((TextView) view.findViewById(R.id.tvContactInitial)).setText(
-                    TextUtils.isEmpty(c.name) ? "?" : c.name.substring(0, 1).toUpperCase(Locale.FRENCH));
+            ((TextView) view.findViewById(R.id.tvContactInitial)).setText(CallActivity.initial(c.name));
             return view;
         }
     }

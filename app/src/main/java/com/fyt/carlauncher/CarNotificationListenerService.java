@@ -10,6 +10,8 @@ public class CarNotificationListenerService extends NotificationListenerService 
 
     public static final String ACTION_NAV_UPDATE = "com.fyt.carlauncher.NAV_UPDATE";
     public static final String EXTRA_NAV_TEXT = "nav_text";
+    /** Dernière consigne envoyée ("" = aucune) : relue par l'accueil quand il revient au premier plan. */
+    public static volatile String lastNavText = "";
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
@@ -42,6 +44,7 @@ public class CarNotificationListenerService extends NotificationListenerService 
     }
 
     private void sendNavBroadcast(String navText) {
+        lastNavText = navText;
         Intent intent = new Intent(ACTION_NAV_UPDATE);
         intent.setPackage(getPackageName());
         intent.putExtra(EXTRA_NAV_TEXT, navText);

@@ -104,6 +104,9 @@ final class FytBt {
 
     // ---- État exposé (lu sur le thread principal)
     int phoneState = -1;
+    /** Augmente à chaque nouvel appel (entrant ou sortant) : sert à l'écran d'appel à repartir de zéro. */
+    int callId;
+    private boolean resetBookOnNextEntry;
     String phoneName, callNumber;
     int talkSeconds;
     long callStartedAt;
@@ -139,13 +142,58 @@ final class FytBt {
      */
     void connect() {
         if (toolkit != null || binding) return;
-        Intent[] candidates = {
-                new Intent(ACTION).setComponent(new ComponentName(PKG, SERVICE)),
-                new Intent(ACTION).setComponent(new ComponentName(PKG, PKG + "." + SERVICE)),
-                new Intent(ACTION).setPackage(PKG),
-        };
+        main.removeCallbacks(retryConnect);
         bindAttempts.clear();
-        for (Intent intent : candidates) {
+        tryCandidate(0);
+    }
+
+    /** Sans réponse du service dans ce délai, on abandonne cette variante et on essaie la suivante. */
+    private static final long BIND_TIMEOUT_MS = 5000;
+    /** Service introuvable : nouvel essai complet plus tard (le service FYT peut démarrer après le launcher). */
+    private static final long RETRY_CONNECT_MS = 60_000;
+    private static final int MAX_CONNECT_ROUNDS = 10;
+    private int candidateIndex, connectRounds;
+
+    private final Runnable retryConnect = this::connect;
+
+    private final Runnable bindTimeout = () -> {
+        if (toolkit != null || !binding) return;
+        bindAttempts.add("  pas de réponse en " + BIND_TIMEOUT_MS / 1000 + " s : variante suivante");
+        note("bindService : pas de réponse, variante suivante");
+        try {
+            app.unbindService(FytBt.this.connection);   // nom qualifié : « connection » est déclaré plus bas
+        } catch (Exception ignored) {
+        }
+        binding = false;
+        tryCandidate(candidateIndex + 1);
+    };
+
+    private Intent[] candidates() {
+        List<Intent> list = new ArrayList<>();
+        list.add(new Intent(ACTION).setComponent(new ComponentName(PKG, SERVICE)));
+        list.add(new Intent(ACTION).setComponent(new ComponentName(PKG, PKG + "." + SERVICE)));
+        // Services qui déclarent l'action FYT, quel que soit leur nom réel sur cet autoradio.
+        try {
+            for (android.content.pm.ResolveInfo ri : app.getPackageManager().queryIntentServices(new Intent(ACTION), 0)) {
+                if (ri.serviceInfo == null) continue;
+                list.add(new Intent(ACTION).setComponent(
+                        new ComponentName(ri.serviceInfo.packageName, ri.serviceInfo.name)));
+            }
+        } catch (Exception ignored) {
+        }
+        list.add(new Intent(ACTION).setPackage(PKG));
+        return list.toArray(new Intent[0]);
+    }
+
+    /**
+     * Essaie les variantes à partir de {@code from}. bindService peut répondre « OK » sans que le service
+     * se connecte jamais : un délai fait alors passer à la variante suivante (avant, tout restait bloqué
+     * sur « connexion… »).
+     */
+    private void tryCandidate(int from) {
+        Intent[] candidates = candidates();
+        for (int i = from; i < candidates.length; i++) {
+            Intent intent = candidates[i];
             String what = intent.getComponent() != null ? intent.getComponent().flattenToShortString()
                     : "action " + ACTION + " + paquet " + PKG;
             try {
@@ -156,9 +204,19 @@ final class FytBt {
                 bindAttempts.add(what + " → " + e.getClass().getSimpleName() + " : " + e.getMessage());
             }
             note("bindService " + bindAttempts.get(bindAttempts.size() - 1));
-            if (binding) break;
+            if (binding) {
+                candidateIndex = i;
+                status = "connexion…";
+                main.removeCallbacks(bindTimeout);
+                main.postDelayed(bindTimeout, BIND_TIMEOUT_MS);
+                return;
+            }
         }
-        status = binding ? "connexion…" : "service FYT absent";
+        status = "service FYT absent";
+        if (++connectRounds < MAX_CONNECT_ROUNDS) {
+            main.removeCallbacks(retryConnect);
+            main.postDelayed(retryConnect, RETRY_CONNECT_MS);
+        }
     }
 
     boolean isReady() {
@@ -172,7 +230,9 @@ final class FytBt {
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            main.removeCallbacks(bindTimeout);
             binding = false;
+            connectRounds = 0;
             toolkit = service;
             btModule = getModule(M_BT);
             mainModule = getModule(M_MAIN);
@@ -318,18 +378,25 @@ final class FytBt {
     // ---------------------------------------------------------------- mises à jour
 
     private void onUpdate(int u, int[] ints, String[] strs) {
-        note("← u" + u + " " + Arrays.toString(ints) + " " + Arrays.toString(strs));
+        // Progression de la musique et durée d'appel : une mise à jour par seconde, elles noyaient le journal.
+        if (u != U_BTAV_PLAY_TIME && u != U_TALK_TIME) {
+            note("← u" + u + " " + Arrays.toString(ints) + " " + Arrays.toString(strs));
+        }
         int i0 = ints != null && ints.length > 0 ? ints[0] : Integer.MIN_VALUE;
         switch (u) {
             case U_PHONE_STATE:
                 if (i0 >= 0 && i0 <= 6) {
+                    boolean wasInCall = isInCall();
                     int previous = phoneState;
                     phoneState = i0;
                     if (i0 == PHONE_TALK && previous != PHONE_TALK) callStartedAt = SystemClock.elapsedRealtime();
+                    if (isInCall() && !wasInCall) callId++;
                     if (!isInCall()) {
                         talkSeconds = 0;
                         audioOnPhone = false;
                     }
+                    // Téléphone déconnecté : ses contacts ne doivent pas rester mélangés à ceux du suivant.
+                    if (i0 == PHONE_DISCONNECTED && previous >= PHONE_CONNECTED) contacts.clear();
                 }
                 break;
             case U_PHONE_NAME:
@@ -361,6 +428,11 @@ final class FytBt {
                 if (i0 >= 0) btavDurationMs = i0;
                 break;
             case U_BOOK:
+                if (resetBookOnNextEntry) {
+                    // Première fiche d'une nouvelle synchronisation : on repart d'une liste vide.
+                    resetBookOnNextEntry = false;
+                    contacts.clear();
+                }
                 parseBookEntry(strs);
                 break;
             default:
@@ -421,8 +493,11 @@ final class FytBt {
 
     // ---------------------------------------------------------------- commandes
 
+    /** Compose un numéro : seuls les chiffres, +, * et # sont envoyés (pas d'espaces ni de parenthèses). */
     boolean dial(String number) {
-        return number != null && !number.trim().isEmpty() && cmd(btModule, C_DIAL, null, new String[]{number.trim()});
+        if (number == null) return false;
+        String clean = number.replaceAll("[^0-9+*#]", "");
+        return !clean.isEmpty() && cmd(btModule, C_DIAL, null, new String[]{clean});
     }
 
     boolean redial() { return cmd(btModule, C_REDIAL, null, null); }
@@ -456,7 +531,15 @@ final class FytBt {
         return cmd(btModule, C_KEY, new int[]{code}, null);
     }
 
-    boolean downloadContacts() { return cmd(btModule, C_DOWNLOAD_BOOK, null, null); }
+    /**
+     * Demande le répertoire. La liste actuelle est vidée seulement quand la première fiche arrive :
+     * une synchronisation qui échoue ne fait pas perdre les contacts déjà reçus.
+     */
+    boolean downloadContacts() {
+        boolean ok = cmd(btModule, C_DOWNLOAD_BOOK, null, null);
+        if (ok) resetBookOnNextEntry = true;
+        return ok;
+    }
 
     boolean btavPlay() { return cmd(btModule, C_BTAV_PLAY, null, null); }
 
@@ -490,6 +573,8 @@ final class FytBt {
     }
 
     private void note(String line) {
+        // Une valeur reçue avec un retour à la ligne (titre, nom) échappait à l'anonymisation ligne par ligne.
+        line = line.replace('\n', ' ').replace('\r', ' ');
         synchronized (log) {
             log.addLast(logTime.format(new Date()) + "  " + line);
             while (log.size() > 300) log.removeFirst();

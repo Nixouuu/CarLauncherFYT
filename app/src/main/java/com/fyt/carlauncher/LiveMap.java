@@ -75,7 +75,10 @@ final class LiveMap implements LocationListener {
     private Marker marker;
     private ValueAnimator animator;
     private boolean following = true;
+    /** Abonné aux positions GPS. */
     private boolean started;
+    /** Carte à l'écran (accueil au premier plan). */
+    private boolean visible;
 
     // Position actuellement affichée (peut être en cours d'animation)
     private boolean hasPosition;
@@ -208,6 +211,15 @@ final class LiveMap implements LocationListener {
         attribution = v;
     }
 
+    /** Aperçu d'un trajet entier : on arrête de suivre la voiture, carte nord en haut (bouton recentrer visible). */
+    void showOverview() {
+        map.getController().stopAnimation(false);
+        if (animator != null) animator.cancel();
+        setFollowing(false);
+        map.setMapOrientation(0f, false);
+        if (hasPosition) marker.setRotation(-shownBearing);
+    }
+
     /** Revient à la voiture d'un coup : pas d'animation qui se battrait avec le suivi en direct. */
     void recenter() {
         map.getController().stopAnimation(false);
@@ -222,31 +234,56 @@ final class LiveMap implements LocationListener {
 
     // ---------------------------------------------------------------- cycle de vie
 
+    /** Carte visible (retour à l'accueil). */
     void start() {
         map.onResume();
-        if (started || locationManager == null || !hasPermission()) return;
-        started = true;
-        try {
-            Location last = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (last == null) last = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-            if (last != null) jumpTo(last);
-
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, this, Looper.getMainLooper());
-            }
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 0f, this, Looper.getMainLooper());
-            }
-        } catch (SecurityException | IllegalArgumentException ignored) {
+        visible = true;
+        // GPS resté actif en arrière-plan pendant un guidage : on replace la voiture sur sa dernière position.
+        if (lastAccepted != null && hasPosition) {
+            applyFrame(lastAccepted.getLatitude(), lastAccepted.getLongitude(), shownBearing);
         }
+        subscribe();
+        handler.removeCallbacks(staleWatchdog);
         handler.post(staleWatchdog);
     }
 
-    void stop() {
+    /**
+     * Abonnement GPS. Fait même si le GPS est désactivé à cet instant : Android envoie les positions dès
+     * qu'il est réactivé (avant, un GPS éteint au démarrage laissait la carte sans position).
+     */
+    private void subscribe() {
+        if (started || locationManager == null || !hasPermission()) return;
+        started = true;
+        try {
+            if (!hasPosition) {
+                Location last = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (last == null) last = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                if (last != null) jumpTo(last);
+            }
+        } catch (SecurityException | IllegalArgumentException ignored) {
+        }
+        try {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, this, Looper.getMainLooper());
+        } catch (SecurityException | IllegalArgumentException ignored) {
+        }
+        try {
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 0f, this, Looper.getMainLooper());
+        } catch (SecurityException | IllegalArgumentException ignored) {
+        }
+    }
+
+    /**
+     * Carte cachée (autre écran devant l'accueil).
+     * @param keepGps vrai pendant un guidage : les positions continuent d'arriver pour les consignes,
+     *                la détection de sortie de route et l'arrivée ; seul le dessin de la carte s'arrête.
+     */
+    void stop(boolean keepGps) {
         map.onPause();
-        started = false;
+        visible = false;
         handler.removeCallbacks(staleWatchdog);
         if (animator != null) animator.cancel();
+        if (keepGps) return;
+        started = false;
         if (locationManager != null) {
             try {
                 locationManager.removeUpdates(this);
@@ -256,7 +293,7 @@ final class LiveMap implements LocationListener {
     }
 
     void onPermissionResult() {
-        if (!started) start();
+        if (visible) subscribe();
     }
 
     private boolean hasPermission() {
@@ -291,6 +328,13 @@ final class LiveMap implements LocationListener {
         lastAccepted = loc;
         recordStats(loc, gps);
         if (observer != null) observer.onLocation(loc);   // Navigator d'abord : il met à jour l'accrochage au trajet
+
+        if (!visible) {
+            // Accueil caché (guidage en arrière-plan) : rien à dessiner, on garde juste la vitesse et le dernier fix.
+            if (gps && lastFix != null) filteredSpeedKmh(loc);
+            lastFix = loc;
+            return;
+        }
 
         if (!hasPosition || lastFix == null) {
             jumpTo(loc);

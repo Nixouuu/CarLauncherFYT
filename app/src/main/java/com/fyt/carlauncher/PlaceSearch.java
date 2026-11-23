@@ -96,6 +96,8 @@ final class PlaceSearch {
     }
 
     void close() {
+        requestSeq++;   // une recherche encore en route ne remplira pas le panneau à sa prochaine ouverture
+        handler.removeCallbacksAndMessages(null);
         hideKeyboard();
         panel.setVisibility(View.GONE);
     }
@@ -141,6 +143,7 @@ final class PlaceSearch {
     // ---------------------------------------------------------------- récents
 
     private void showRecents() {
+        requestSeq++;   // un résultat de recherche arrivé en retard ne remplace plus les récents
         adapter.items = loadRecents();
         adapter.notifyDataSetChanged();
         hint.setText(adapter.items.isEmpty() ? R.string.nav_type_address : R.string.nav_recent);

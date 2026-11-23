@@ -12,6 +12,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -26,7 +28,9 @@ import org.osmdroid.views.MapView;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -70,16 +74,20 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver navReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (navigator != null && navigator.isActive()) return;   // notre guidage a la priorité
-            String text = intent.getStringExtra(CarNotificationListenerService.EXTRA_NAV_TEXT);
-            if (!TextUtils.isEmpty(text)) {
-                tvNavInstruction.setText(text);
-                navBanner.setVisibility(View.VISIBLE);
-            } else {
-                navBanner.setVisibility(View.GONE);
-            }
+            showWazeInstruction(intent.getStringExtra(CarNotificationListenerService.EXTRA_NAV_TEXT));
         }
     };
+
+    /** Consigne Waze / Google Maps (notification) dans le bandeau, sauf pendant notre propre guidage. */
+    private void showWazeInstruction(String text) {
+        if (navigator != null && navigator.isActive()) return;   // notre guidage a la priorité
+        if (!TextUtils.isEmpty(text)) {
+            tvNavInstruction.setText(text);
+            navBanner.setVisibility(View.VISIBLE);
+        } else {
+            navBanner.setVisibility(View.GONE);
+        }
+    }
 
     /** Retiré dans onDestroy : FytBt est un singleton, il ne doit pas garder l'Activity en vie. */
     private final FytBt.Listener fytListener = code -> {
@@ -133,7 +141,8 @@ public class MainActivity extends Activity {
         setupActions();
         refreshShortcutLabels();
         requestLocationIfNeeded();
-        checkOtaUpdate();
+        navigator.restoreSaved();   // guidage interrompu par une fermeture du launcher : on le reprend
+        ui.post(otaTick);
 
         IntentFilter pkgFilter = new IntentFilter();
         pkgFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -252,8 +261,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Une seule fenêtre à la fois : un double appui rapide n'en empile plus deux. */
+    private AlertDialog openDialog;
+
+    private boolean dialogOpen() {
+        return openDialog != null && openDialog.isShowing();
+    }
+
     private void openLauncherSettings() {
-        SettingsDialog.show(this, prefs, sound, new SettingsDialog.Actions() {
+        if (dialogOpen()) return;
+        openDialog = SettingsDialog.show(this, prefs, sound, new SettingsDialog.Actions() {
             @Override public void pickMusicApp() { openAppPicker(MediaHub.SLOT_MUSIC, getString(R.string.music_title)); }
             @Override public void openHomeChooser() { MainActivity.this.openHomeChooser(); }
             @Override public void openAndroidSettings() { MainActivity.this.openAndroidSettings(); }
@@ -272,6 +289,8 @@ public class MainActivity extends Activity {
         liveMap.start();
         mediaHub.start();
         checkOtaUpdate();
+        // Consigne Waze arrivée ou retirée pendant que l'accueil était caché (récepteur alors désinscrit).
+        showWazeInstruction(CarNotificationListenerService.lastNavText);
 
         IntentFilter timeFilter = new IntentFilter();
         timeFilter.addAction(Intent.ACTION_TIME_TICK);
@@ -291,7 +310,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        liveMap.stop();
+        // Pendant un guidage, le GPS reste actif quand un autre écran passe devant (appel, téléphone, autre app).
+        liveMap.stop(navigator.isActive());
         mediaHub.stop();
         try { unregisterReceiver(timeReceiver); } catch (IllegalArgumentException ignored) {}
         try { unregisterReceiver(navReceiver); } catch (IllegalArgumentException ignored) {}
@@ -300,6 +320,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        ui.removeCallbacksAndMessages(null);
+        if (liveMap != null) liveMap.stop(false);
+        if (openDialog != null && openDialog.isShowing()) openDialog.dismiss();
         try { unregisterReceiver(packageReceiver); } catch (IllegalArgumentException ignored) {}
         if (fyt != null) fyt.removeListener(fytListener);
         DiagReport.setExtra(null);
@@ -331,21 +354,42 @@ public class MainActivity extends Activity {
     }
 
     private static final long OTA_CHECK_INTERVAL_MS = 30 * 60_000;
+    /** Après un échec (pas encore d'Internet au démarrage de la voiture), nouvel essai 2 min plus tard. */
+    private static final long OTA_RETRY_MS = 2 * 60_000;
     private long lastOtaCheckAt;
+    private final Handler ui = new Handler(Looper.getMainLooper());
+
+    /** Vérifie la mise à jour toutes les minutes au plus (même si on ne quitte jamais l'accueil). */
+    private final Runnable otaTick = new Runnable() {
+        @Override
+        public void run() {
+            checkOtaUpdate();
+            ui.postDelayed(this, 60_000);
+        }
+    };
 
     /**
-     * Le launcher (accueil, singleTask) n'est presque jamais recréé : vérifier seulement dans onCreate
-     * ratait les nouvelles versions publiées après le démarrage. On revérifie donc au retour à l'accueil,
-     * au plus une fois toutes les 30 min.
+     * Le launcher (accueil, singleTask) n'est presque jamais recréé : on revérifie donc régulièrement,
+     * au plus une fois toutes les 30 min après une vérification réussie, toutes les 2 min après un échec.
      */
     private void checkOtaUpdate() {
         long now = android.os.SystemClock.elapsedRealtime();
         if (lastOtaCheckAt != 0 && now - lastOtaCheckAt < OTA_CHECK_INTERVAL_MS) return;
         lastOtaCheckAt = now;
-        OtaUpdater.checkForUpdate(this, executor, (latestTag, downloadUrl) -> {
-            if (isFinishing() || isDestroyed()) return;
-            pendingUpdateUrl = downloadUrl;
-            btnOtaUpdate.setVisibility(View.VISIBLE);
+        OtaUpdater.checkForUpdate(this, executor, new OtaUpdater.UpdateCallback() {
+            @Override
+            public void onUpdateAvailable(String latestTag, String downloadUrl) {
+                if (isFinishing() || isDestroyed()) return;
+                pendingUpdateUrl = downloadUrl;
+                btnOtaUpdate.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onCheckFailed() {
+                // Prochain essai dans OTA_RETRY_MS au lieu de 30 min.
+                lastOtaCheckAt = android.os.SystemClock.elapsedRealtime() - OTA_CHECK_INTERVAL_MS + OTA_RETRY_MS;
+                if (lastOtaCheckAt == 0) lastOtaCheckAt = -1;
+            }
         });
     }
 
@@ -379,6 +423,7 @@ public class MainActivity extends Activity {
     }
 
     private void openAppPicker(final String slotKey, final String slotName) {
+        if (dialogOpen()) return;
         final ListView list = new ListView(this);
         list.setDivider(null);
         list.setSoundEffectsEnabled(false);
@@ -387,18 +432,33 @@ public class MainActivity extends Activity {
                 .setView(list)
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
+        openDialog = dialog;
         dialog.show();
 
-        Apps.get(this, apps -> {
+        final boolean musicSlot = MediaHub.SLOT_MUSIC.equals(slotKey);
+        Apps.get(this, all -> {
             if (isFinishing() || isDestroyed() || !dialog.isShowing()) return;
+            // Musique : première ligne « Musique Bluetooth » pour revenir à l'iPhone sans app associée.
+            final List<AppInfo> apps = new ArrayList<>(all.size() + 1);
+            if (musicSlot) apps.add(new AppInfo(getString(R.string.music_bt), "", getDrawable(R.drawable.ic_smartphone)));
+            apps.addAll(all);
             list.setAdapter(new AppListAdapter(this, apps, R.layout.item_app_picker));
             list.setOnItemClickListener((parent, view, position, id) -> {
                 sound.play();
                 AppInfo chosen = apps.get(position);
-                prefs.edit()
-                        .putString(slotKey + KEY_PKG_SUFFIX, chosen.packageName)
-                        .putString(slotKey + KEY_NAME_SUFFIX, chosen.label)
-                        .apply();
+                if (TextUtils.isEmpty(chosen.packageName)) {
+                    prefs.edit()
+                            .remove(slotKey + KEY_PKG_SUFFIX)
+                            .remove(slotKey + KEY_NAME_SUFFIX)
+                            .putBoolean(MediaHub.KEY_MUSIC_BT_ONLY, true)
+                            .apply();
+                } else {
+                    SharedPreferences.Editor e = prefs.edit()
+                            .putString(slotKey + KEY_PKG_SUFFIX, chosen.packageName)
+                            .putString(slotKey + KEY_NAME_SUFFIX, chosen.label);
+                    if (musicSlot) e.remove(MediaHub.KEY_MUSIC_BT_ONLY);
+                    e.apply();
+                }
                 refreshShortcutLabels();
                 Toast.makeText(this, getString(R.string.app_assigned, chosen.label, slotName),
                         Toast.LENGTH_SHORT).show();
@@ -422,6 +482,7 @@ public class MainActivity extends Activity {
      * « Envoyer sur GitHub » envoie le rapport complet (anonymisé) sans clé USB ni photo.
      */
     private void showDiagnostics() {
+        if (dialogOpen()) return;
         TextView text = new TextView(this);
         text.setText(navigator.voiceStatus() + "\n" + liveMap.stats() + "\n" + fyt.dump());
         text.setTextColor(0xFFFFFFFF);
@@ -432,7 +493,7 @@ public class MainActivity extends Activity {
         text.setPadding(pad, pad, pad, pad);
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         scroll.addView(text);
-        new AlertDialog.Builder(this, R.style.CarDialogTheme)
+        openDialog = new AlertDialog.Builder(this, R.style.CarDialogTheme)
                 .setTitle(R.string.settings_diagnostics)
                 .setView(scroll)
                 .setPositiveButton(R.string.settings_close, null)

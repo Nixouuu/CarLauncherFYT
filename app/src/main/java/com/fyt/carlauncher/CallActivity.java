@@ -13,6 +13,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
@@ -23,6 +24,10 @@ public class CallActivity extends Activity implements FytBt.Listener {
 
     private static boolean visible;
     private static boolean watching;
+    /** Écran d'appel existant (même caché derrière l'accueil), pour le fermer à la fin de l'appel. */
+    private static WeakReference<CallActivity> current;
+    /** Dernier appel / état pour lequel l'écran a été ouvert : un état répété ne le rouvre pas. */
+    private static int openedForCall = -1, openedForState = -1;
 
     /** À appeler une fois (au démarrage du launcher) : ouvre l'écran d'appel à chaque appel. */
     static void watchCalls(Context context) {
@@ -31,17 +36,38 @@ public class CallActivity extends Activity implements FytBt.Listener {
         final Context app = context.getApplicationContext();
         final FytBt bt = FytBt.get(app);
         bt.addListener(code -> {
-            if (code == FytBt.U_PHONE_STATE && bt.isInCall() && !visible) {
-                Intent i = new Intent(app, CallActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                try {
-                    app.startActivity(i);
-                } catch (Exception ignored) {
-                }
+            if (code != FytBt.U_PHONE_STATE) return;
+            if (!bt.isInCall()) {
+                // Appel terminé pendant que l'écran était caché (retour à l'accueil) : on le ferme quand même.
+                CallActivity a = current != null ? current.get() : null;
+                if (a != null && !visible && !a.isFinishing()) a.finish();
+                return;
+            }
+            // On ouvre à chaque nouvel appel ou changement d'état (sonnerie → en ligne), pas à chaque
+            // répétition du même état : sinon « retour à l'accueil » pendant un appel était aussitôt annulé.
+            if (visible || (bt.callId == openedForCall && bt.phoneState == openedForState)) return;
+            openedForCall = bt.callId;
+            openedForState = bt.phoneState;
+            Intent i = new Intent(app, CallActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            try {
+                app.startActivity(i);
+            } catch (Exception ignored) {
             }
         });
     }
+
+    /** Première lettre d'un nom (emoji et lettres hors BMP comprises, sans couper un caractère en deux). */
+    static String initial(String name) {
+        if (TextUtils.isEmpty(name)) return "?";
+        String s = name.trim();
+        if (s.isEmpty()) return "?";
+        return s.substring(0, s.offsetByCodePoints(0, 1)).toUpperCase(Locale.FRENCH);
+    }
+
+    /** Appel affiché actuellement : un autre numéro = nouvel appel, on vide le clavier de l'appel précédent. */
+    private int shownCallId = -1;
 
     private FytBt bt;
     private ClickSound sound;
@@ -59,6 +85,7 @@ public class CallActivity extends Activity implements FytBt.Listener {
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         setContentView(R.layout.activity_call);
+        current = new WeakReference<>(this);
         bt = FytBt.get(this);
         sound = ClickSound.get(this);
 
@@ -144,11 +171,25 @@ public class CallActivity extends Activity implements FytBt.Listener {
         }
     };
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (current != null && current.get() == this) current = null;
+        handler.removeCallbacksAndMessages(null);
+    }
+
     private void render() {
         int state = bt.phoneState;
         if (!bt.isInCall() && state != -1) {
             finishSoon();
             return;
+        }
+        if (bt.callId != shownCallId) {
+            // Nouvel appel dans un écran réutilisé : clavier fermé et chiffres de l'appel précédent effacés.
+            shownCallId = bt.callId;
+            dtmf.setLength(0);
+            keypad.setVisibility(View.GONE);
+            callButtons.setVisibility(View.VISIBLE);
         }
         String number = bt.callNumber;
         String name = contactName(number);
@@ -156,8 +197,7 @@ public class CallActivity extends Activity implements FytBt.Listener {
         if (keypad.getVisibility() != View.VISIBLE) {
             tvNumber.setText(!TextUtils.isEmpty(name) && !TextUtils.isEmpty(number) ? number : "");
         }
-        String initial = !TextUtils.isEmpty(name) ? name.substring(0, 1).toUpperCase(Locale.FRENCH) : "?";
-        tvAvatar.setText(initial);
+        tvAvatar.setText(initial(name));
 
         boolean ringing = state == FytBt.PHONE_RING;
         panelIncoming.setVisibility(ringing ? View.VISIBLE : View.GONE);

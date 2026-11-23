@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Client minimal des services Stadia Maps (clé dans BuildConfig, injectée par le CI depuis le secret
@@ -72,7 +73,14 @@ final class StadiaApi {
         }
     }
 
-    private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
+    /**
+     * Files séparées : avec un réseau faible, une recherche lente (jusqu'à 20 s) ne retarde plus le calcul
+     * de l'itinéraire ni un recalcul en conduisant.
+     */
+    private static final ExecutorService SEARCH_EXEC = Executors.newSingleThreadExecutor();
+    private static final ExecutorService ROUTE_EXEC = Executors.newSingleThreadExecutor();
+    /** Numéro de la dernière recherche : les recherches dépassées en attente ne sont pas envoyées. */
+    private static final AtomicInteger searchGen = new AtomicInteger();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private StadiaApi() {}
@@ -84,7 +92,9 @@ final class StadiaApi {
     // ---------------------------------------------------------------- recherche
 
     static void autocomplete(final String text, final double lat, final double lon, final Callback<List<Place>> cb) {
-        EXEC.execute(() -> {
+        final int gen = searchGen.incrementAndGet();
+        SEARCH_EXEC.execute(() -> {
+            if (gen != searchGen.get()) return;   // une recherche plus récente a été tapée entre-temps
             try {
                 String url = "https://api.stadiamaps.com/geocoding/v1/autocomplete?text=" + URLEncoder.encode(text, "UTF-8")
                         + "&focus.point.lat=" + lat + "&focus.point.lon=" + lon
@@ -112,7 +122,7 @@ final class StadiaApi {
     /** @param heading cap actuel en degrés (ou -1) : évite un demi-tour inutile au départ. */
     static void route(final double fromLat, final double fromLon, final float heading,
                       final double toLat, final double toLon, final Callback<Route> cb) {
-        EXEC.execute(() -> {
+        ROUTE_EXEC.execute(() -> {
             try {
                 JSONObject start = new JSONObject().put("lat", fromLat).put("lon", fromLon);
                 if (heading >= 0) start.put("heading", Math.round(heading)).put("heading_tolerance", 45);
@@ -178,7 +188,7 @@ final class StadiaApi {
 
     /** Vérifie que la clé est acceptée pour les tuiles (sinon la carte retombe sur OpenStreetMap). */
     static void checkTiles(final Callback<Boolean> cb) {
-        EXEC.execute(() -> {
+        ROUTE_EXEC.execute(() -> {
             HttpURLConnection c = null;
             try {
                 c = (HttpURLConnection) new URL("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/1/0/0.png?api_key=" + KEY)

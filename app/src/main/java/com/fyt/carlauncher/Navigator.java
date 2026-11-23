@@ -3,6 +3,7 @@ package com.fyt.carlauncher;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Paint;
 import android.location.Location;
 import android.media.AudioAttributes;
@@ -43,6 +44,19 @@ final class Navigator {
     private static final float WRONG_WAY_DEG = 120f;
     private static final float ARRIVED_M = 35f;
     private static final long REROUTE_MIN_INTERVAL_MS = 8000;
+    /** Intervalle maximal entre deux recalculs quand on reste hors du trajet (il double à chaque essai). */
+    private static final long REROUTE_MAX_INTERVAL_MS = 60_000;
+    /** Pas de recalcul sous cette vitesse (m/s) : voiture garée ou arrêtée hors de la route. */
+    private static final float REROUTE_MIN_SPEED_MS = 2f;
+    /** Distance minimale parcourue depuis le dernier recalcul avant d'en demander un autre. */
+    private static final float REROUTE_MIN_MOVE_M = 30f;
+    /** Un trajet enregistré plus vieux que ça n'est pas repris au redémarrage du launcher. */
+    private static final long RESUME_MAX_AGE_MS = 3 * 3600_000L;
+
+    private static final String KEY_DEST_NAME = "nav_dest_name";
+    private static final String KEY_DEST_LAT = "nav_dest_lat";
+    private static final String KEY_DEST_LON = "nav_dest_lon";
+    private static final String KEY_DEST_AT = "nav_dest_at";
 
     private final Activity activity;
     private final MapView map;
@@ -63,6 +77,10 @@ final class Navigator {
     private int announcedAlertFor = -1, announcedPreFor = -1;
     private int offRouteCount;
     private long lastRerouteAt;
+    private long rerouteIntervalMs = REROUTE_MIN_INTERVAL_MS;
+    private Location lastRerouteFrom;
+    /** Numéro de la dernière demande d'itinéraire : une réponse plus ancienne est ignorée. */
+    private int routeSeq;
     private boolean active, routing;
     // Dernier « accrochage » au trajet : distance parcourue le long du trajet et validité.
     private double lastAlong;
@@ -92,6 +110,18 @@ final class Navigator {
     // ---------------------------------------------------------------- démarrage / arrêt
 
     void navigateTo(String name, double lat, double lon) {
+        Location here = liveMap.lastLocation();
+        if (here == null) {
+            Toast.makeText(activity, R.string.nav_no_gps, Toast.LENGTH_LONG).show();
+            return;
+        }
+        begin(name, lat, lon);
+        saveDestination();
+        requestRoute(here, true);
+    }
+
+    /** Prépare l'écran de guidage pour une destination (le calcul d'itinéraire est demandé à part). */
+    private void begin(String name, double lat, double lon) {
         // Une arrivée précédente avait programmé un arrêt dans 6 s : il ne doit pas couper ce nouveau trajet.
         map.removeCallbacks(stopAfterArrival);
         destName = name;
@@ -102,12 +132,12 @@ final class Navigator {
         onRoute = false;
         reroutes = 0;
         lastRouteError = null;
+        lastRerouteFrom = null;
+        rerouteIntervalMs = REROUTE_MIN_INTERVAL_MS;
+        // Un calcul encore en cours pour l'ancienne destination ne doit ni bloquer ni remplacer celui-ci.
+        routeSeq++;
+        routing = false;
         ensureTts();
-        Location here = liveMap.lastLocation();
-        if (here == null) {
-            Toast.makeText(activity, R.string.nav_no_gps, Toast.LENGTH_LONG).show();
-            return;
-        }
         active = true;
         banner.setVisibility(View.VISIBLE);
         bottomBar.setVisibility(View.VISIBLE);
@@ -116,20 +146,58 @@ final class Navigator {
         tvDistance.setText("");
         tvInstruction.setText(R.string.nav_computing);
         tvEta.setText(name);
-        requestRoute(here, true);
+    }
+
+    /**
+     * Reprend le trajet en cours si le launcher a été fermé ou recréé par Android pendant un guidage.
+     * L'itinéraire est recalculé à la première position GPS (voir onLocation, cas route == null).
+     */
+    void restoreSaved() {
+        SharedPreferences p = prefs();
+        String name = p.getString(KEY_DEST_NAME, null);
+        long at = p.getLong(KEY_DEST_AT, 0);
+        if (name == null || at <= 0 || System.currentTimeMillis() - at > RESUME_MAX_AGE_MS) {
+            clearDestination();
+            return;
+        }
+        begin(name, Double.longBitsToDouble(p.getLong(KEY_DEST_LAT, 0)),
+                Double.longBitsToDouble(p.getLong(KEY_DEST_LON, 0)));
+        lastRerouteAt = 0;   // calcul dès la première position
+        Location here = liveMap.lastLocation();
+        if (here != null) onLocation(here);
+    }
+
+    private SharedPreferences prefs() {
+        return activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    private void saveDestination() {
+        prefs().edit()
+                .putString(KEY_DEST_NAME, destName)
+                .putLong(KEY_DEST_LAT, Double.doubleToRawLongBits(destLat))
+                .putLong(KEY_DEST_LON, Double.doubleToRawLongBits(destLon))
+                .putLong(KEY_DEST_AT, System.currentTimeMillis())
+                .apply();
+    }
+
+    private void clearDestination() {
+        prefs().edit().remove(KEY_DEST_NAME).remove(KEY_DEST_LAT).remove(KEY_DEST_LON).remove(KEY_DEST_AT).apply();
     }
 
     void stop() {
         map.removeCallbacks(stopAfterArrival);
         active = false;
         routing = false;
+        routeSeq++;   // une réponse encore attendue sera ignorée
         route = null;
         onRoute = false;
         removeLines();
         banner.setVisibility(View.GONE);
         bottomBar.setVisibility(View.GONE);
         liveMap.setNavigationMode(false);
+        clearDestination();
         if (tts != null) tts.stop();
+        abandonFocus();   // une consigne coupée en plein milieu ne doit pas laisser la musique baissée
     }
 
     void release() {
@@ -163,8 +231,11 @@ final class Navigator {
         if (routing) return;
         routing = true;
         lastRerouteAt = SystemClock.elapsedRealtime();
+        lastRerouteFrom = from;
+        final int seq = ++routeSeq;
         float heading = from.hasBearing() && from.getSpeed() > 2f ? from.getBearing() : -1f;
         StadiaApi.route(from.getLatitude(), from.getLongitude(), heading, destLat, destLon, (r, error) -> {
+            if (seq != routeSeq) return;   // réponse pour une ancienne destination (ou guidage arrêté)
             routing = false;
             if (!active) return;
             if (r == null || r.shape.size() < 2) {
@@ -180,6 +251,9 @@ final class Navigator {
             setRoute(r);
             if (firstTime) {
                 speak(activity.getString(R.string.nav_start_spoken, destName));
+                // Aperçu du trajet entier : le suivi de la voiture est suspendu pendant l'aperçu,
+                // sinon chaque image GPS recentrait la carte au milieu de l'animation.
+                liveMap.showOverview();
                 map.zoomToBoundingBox(BoundingBox.fromGeoPoints(r.shape).increaseByScale(1.25f), true);
                 map.postDelayed(() -> { if (active) liveMap.setNavigationMode(true); }, 2500);
             } else {
@@ -277,20 +351,27 @@ final class Navigator {
         lastAlong = along;
         onRoute = distToRoute <= SNAP_M && !wrongWay;
 
-        // Hors trajet ou à contresens : 2 positions de suite suffisent, puis au plus un recalcul toutes les 8 s.
+        // Hors trajet ou à contresens : 2 positions de suite suffisent. Ensuite, recalcul seulement si la
+        // voiture roule et a bougé depuis le dernier recalcul ; l'intervalle double à chaque essai (8 s → 60 s).
+        // Sans ça, une voiture garée à plus de 30 m de la route (station-service, stationnement) recalculait
+        // toutes les 8 s sans fin.
         float accuracy = loc.hasAccuracy() ? loc.getAccuracy() : 15f;
         double offThreshold = Math.max(OFF_ROUTE_MIN_M, Math.min(OFF_ROUTE_MAX_M, accuracy * 1.5 + 15));
         if (distToRoute > offThreshold || wrongWay) {
             offRouteCount++;
-            if (offRouteCount >= 2 && !routing
-                    && SystemClock.elapsedRealtime() - lastRerouteAt > REROUTE_MIN_INTERVAL_MS) {
+            boolean driving = !loc.hasSpeed() || loc.getSpeed() >= REROUTE_MIN_SPEED_MS;
+            boolean moved = lastRerouteFrom == null || lastRerouteFrom.distanceTo(loc) >= REROUTE_MIN_MOVE_M;
+            if (offRouteCount >= 2 && !routing && driving && moved
+                    && SystemClock.elapsedRealtime() - lastRerouteAt > rerouteIntervalMs) {
                 tvInstruction.setText(R.string.nav_computing);
                 tvDistance.setText("");
                 requestRoute(loc, false);
+                rerouteIntervalMs = Math.min(REROUTE_MAX_INTERVAL_MS, rerouteIntervalMs * 2);
             }
             if (offRouteCount >= 2) return;   // consignes de l'ancien trajet fausses : on attend le nouveau
         } else {
             offRouteCount = 0;
+            rerouteIntervalMs = REROUTE_MIN_INTERVAL_MS;
         }
 
         // Arrivée
@@ -305,6 +386,7 @@ final class Navigator {
             route = null;
             onRoute = false;
             active = false;   // plus de recalcul ni de nouvelle demande d'itinéraire après l'arrivée
+            clearDestination();
             return;
         }
 
@@ -474,6 +556,7 @@ final class Navigator {
     // ---------------------------------------------------------------- voix
 
     private static final String GOOGLE_TTS = "com.google.android.tts";
+    private boolean googleTtsFailed;
     private String voiceStatus = "voix : pas encore initialisée";
     private String pendingSpeech;
 
@@ -497,9 +580,22 @@ final class Navigator {
     void ensureTts() {
         if (tts != null) return;
         // Moteur Google en priorité (meilleure voix française), sinon le moteur par défaut de l'autoradio.
-        boolean google = Apps.isInstalledPackage(activity, GOOGLE_TTS);
+        final boolean google = !googleTtsFailed && Apps.isInstalledPackage(activity, GOOGLE_TTS);
         TextToSpeech.OnInitListener onInit = status -> {
-            if (status != TextToSpeech.SUCCESS || tts == null) {
+            if (tts == null) return;   // libéré entre-temps (release)
+            if (status != TextToSpeech.SUCCESS) {
+                if (google) {
+                    // Le moteur Google n'a pas démarré : on réessaie avec le moteur par défaut de l'autoradio.
+                    googleTtsFailed = true;
+                    TextToSpeech failed = tts;
+                    tts = null;
+                    try {
+                        failed.shutdown();
+                    } catch (Exception ignored) {
+                    }
+                    activity.runOnUiThread(this::ensureTts);
+                    return;
+                }
                 voiceStatus = activity.getString(R.string.nav_voice_no_engine);
                 return;
             }
@@ -530,6 +626,7 @@ final class Navigator {
                 @Override public void onStart(String id) {}
                 @Override public void onDone(String id) { abandonFocus(); }
                 @Override public void onError(String id) { abandonFocus(); }
+                @Override public void onStop(String id, boolean interrupted) { abandonFocus(); }
             });
         };
         Context app = activity.getApplicationContext();
@@ -548,6 +645,7 @@ final class Navigator {
         if (text == null || text.isEmpty()) return;
         if (!force && !activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_VOICE, false)) return;   // voix désactivée par défaut (Réglages › Voix de navigation)
+        if (!force && FytBt.get(activity).isInCall()) return;   // pas de consigne par-dessus un appel
         if (!ttsReady || tts == null) {
             pendingSpeech = text;   // dite dès que la voix est prête
             ensureTts();
@@ -569,8 +667,9 @@ final class Navigator {
     }
 
     private void abandonFocus() {
-        if (Build.VERSION.SDK_INT >= 26 && focusRequest != null) {
-            audioManager.abandonAudioFocusRequest(focusRequest);
+        if (audioManager == null) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            if (focusRequest != null) audioManager.abandonAudioFocusRequest(focusRequest);
         } else {
             audioManager.abandonAudioFocus(null);
         }

@@ -38,6 +38,8 @@ import java.util.List;
 final class MediaHub {
 
     static final String SLOT_MUSIC = "slot_music";
+    /** Choix « Musique Bluetooth » dans le sélecteur : aucune app musique, même si Spotify etc. est installé. */
+    static final String KEY_MUSIC_BT_ONLY = "slot_music_bt_only";
     private static final String[] MUSIC_CANDIDATES = {
             "com.apple.android.music",
             "com.spotify.music",
@@ -88,6 +90,7 @@ final class MediaHub {
 
     /** App musique choisie, sinon la première app connue installée, sinon null (Bluetooth / dernière app). */
     String musicPackage() {
+        if (prefs.getBoolean(KEY_MUSIC_BT_ONLY, false)) return null;
         String pkg = prefs.getString(SLOT_MUSIC + MainActivity.KEY_PKG_SUFFIX, null);
         if (!TextUtils.isEmpty(pkg) && Apps.isInstalled(activity, pkg)) return pkg;
         for (String candidate : MUSIC_CANDIDATES) {
@@ -171,13 +174,18 @@ final class MediaHub {
         }
     };
 
-    /** Priorité à la session qui joue ; sinon la plus récente. */
-    private static MediaController pickController(List<MediaController> list) {
-        if (list == null || list.isEmpty()) return null;
-        for (MediaController c : list) {
-            if (isPlaying(c.getPlaybackState())) return c;
+    /**
+     * Priorité à la session Android qui joue ; sinon, si la musique Bluetooth de l'iPhone joue, aucune session
+     * (le lecteur passe sur le Bluetooth FYT) ; sinon la session la plus récente, même en pause.
+     */
+    private MediaController pickController(List<MediaController> list) {
+        if (list != null) {
+            for (MediaController c : list) {
+                if (isPlaying(c.getPlaybackState())) return c;
+            }
         }
-        return list.get(0);
+        if (fyt.isReady() && fyt.isPhoneConnected() && fyt.btavPlaying) return null;
+        return list == null || list.isEmpty() ? null : list.get(0);
     }
 
     private void refreshSessions() {
@@ -244,7 +252,14 @@ final class MediaHub {
     }
 
     private final FytBt.Listener fytListener = code -> {
-        if (!started || controller != null) return;
+        if (!started) return;
+        if (controller != null) {
+            // Une app Android en pause était affichée : si l'iPhone se met à jouer, le lecteur passe sur lui.
+            if (code == FytBt.U_BTAV_PLAY_STATE && fyt.btavPlaying && !isPlaying(controller.getPlaybackState())) {
+                refreshSessions();
+            }
+            return;
+        }
         if (code == FytBt.U_BTAV_TITLE || code == FytBt.U_BTAV_ARTIST || code == FytBt.U_PHONE_STATE
                 || code == FytBt.U_PHONE_NAME || code == -1) {
             renderIdle();

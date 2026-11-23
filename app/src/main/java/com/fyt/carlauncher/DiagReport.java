@@ -54,8 +54,16 @@ import java.util.function.Supplier;
  */
 final class DiagReport {
 
-    private static final String ISSUES_API = "https://api.github.com/repos/Nixouuu/CarLauncherFYT/issues";
+    /**
+     * Dépôt qui reçoit les rapports : variable GitHub DIAG_REPO (CI), idéalement un dépôt PRIVÉ séparé.
+     * Par défaut le dépôt public de l'app (comportement d'origine).
+     */
+    private static final String ISSUES_API = "https://api.github.com/repos/" + diagRepo() + "/issues";
     private static final String KEY_SENT_VERSION = "diag_sent_version";
+    /** Rapports « fin d'appel » déjà envoyés pour la version installée (clé + version). */
+    private static final String KEY_CALL_REPORTS = "diag_call_reports_v";
+    /** Au plus ce nombre de rapports de fin d'appel par version (avant : à chaque appel, sans limite). */
+    private static final int MAX_CALL_REPORTS_PER_VERSION = 3;
     private static final long AUTO_DELAY_MS = 90_000;
     private static final long RETRY_DELAY_MS = 5 * 60_000;
     private static final long MIN_CALL_REPORT_INTERVAL_MS = 5 * 60_000;
@@ -74,6 +82,11 @@ final class DiagReport {
     }
 
     private DiagReport() {}
+
+    private static String diagRepo() {
+        String r = BuildConfig.DIAG_REPO.trim();
+        return r.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+") ? r : "Nixouuu/CarLauncherFYT";
+    }
 
     static boolean hasToken() {
         return !BuildConfig.DIAG_TOKEN.trim().isEmpty();
@@ -101,9 +114,15 @@ final class DiagReport {
             boolean inCall = bt.isInCall();
             if (wasInCall[0] && !inCall
                     && SystemClock.elapsedRealtime() - lastCallReportAt > MIN_CALL_REPORT_INTERVAL_MS) {
-                lastCallReportAt = SystemClock.elapsedRealtime();
-                // Petit délai : les dernières mises à jour FYT de l'appel arrivent juste après.
-                MAIN.postDelayed(() -> send(app, "fin d'appel", null), 3000);
+                SharedPreferences prefs = app.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE);
+                String key = KEY_CALL_REPORTS + versionCode(app);
+                int sent = prefs.getInt(key, 0);
+                if (sent < MAX_CALL_REPORTS_PER_VERSION) {
+                    lastCallReportAt = SystemClock.elapsedRealtime();
+                    prefs.edit().putInt(key, sent + 1).apply();
+                    // Petit délai : les dernières mises à jour FYT de l'appel arrivent juste après.
+                    MAIN.postDelayed(() -> send(app, "fin d'appel", null), 3000);
+                }
             }
             wasInCall[0] = inCall;
         });
@@ -145,8 +164,9 @@ final class DiagReport {
             } catch (Throwable t) {
                 body = "Erreur pendant la construction du rapport : " + t + "\n\n```\n" + fytPart + "\n```";
             }
+            // Date seulement : l'heure exacte d'une fin d'appel n'a pas à être publique.
             String title = "[Diagnostic] v" + versionName(app) + " · " + reason + " · "
-                    + new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.FRENCH).format(new Date())
+                    + new SimpleDateFormat("yyyy-MM-dd", Locale.FRENCH).format(new Date())
                     + " · FYT " + FytBt.get(app).status();
             boolean ok;
             String message;
